@@ -16,6 +16,7 @@
 #define HW1_HEADER_HAS_BEEN_INCLUDED
 
 #include <stdio.h>
+#include <stdint.h>
 
 #define HW1_FLAG_GENERATE_HEAT_IMAGE  0x0001
 #define HW1_FLAG_TIME_ALG             0x0002
