@@ -23,6 +23,7 @@ int read_input_file( hw1_params_t* params )
     params->num_sources = 0;  /* default values */
     params->num_threads = 1;
     params->vis_step = 10000000;  /* big enough to never generate the graphical heat map */
+    params->alg_type = 0;  /* pick a sensible default */
 
     if( NULL == params->input )
         return -1;
@@ -40,6 +41,10 @@ int read_input_file( hw1_params_t* params )
 
         if( 0 == strncmp(cmd, "iter", 4) ) {
             sscanf(cmd + 5, "%u", &params->max_iterations);
+            continue;
+        }
+        if( 0 == strncmp(cmd, "alg", 3) ) {
+            sscanf(cmd + 4, "%u", &params->alg_type);
             continue;
         }
         if( 0 == strncmp(cmd, "resolution", 10) ) {

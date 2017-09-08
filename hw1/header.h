@@ -30,6 +30,7 @@ typedef struct heat_source_s {
 } heat_source_t;
 
 typedef struct hw1_params_s {
+    uint32_t alg_type;
     uint32_t max_iterations;  /* leave to 0 to only stop on residual */
     uint32_t resolution;
     uint32_t num_threads;
@@ -56,6 +57,13 @@ int hw1_fini(hw1_params_t* param);
  */
 int coarsen(const double* src, uint32_t srcx, uint32_t srcy,
             double* dst, uint32_t dstx, uint32_t dsty);
+
+/**
+ * A function to setup the initial values for the boundaries based on the
+ * known heat sources. It is generic for most of the relaxations, for as long
+ * as the provided size accounts the boundaries.
+ */
+int relaxation_matrix_set(hw1_params_t* hw_params, double* mat, uint32_t np);
 
 /**
  * The number of differewnt values of gray in the output image */

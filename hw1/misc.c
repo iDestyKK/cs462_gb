@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "header.h"
 static double coarsen_block( const double* src, int posx, int posy, int ldsrc, int ncols, int nrows )
 {
     double val = 0.0;
@@ -92,6 +93,66 @@ int print_matrix( FILE* fp, const double* mat, int sizex, int sizey )
             fprintf(fp, "%8.4lf", mat[j * sizex + i]);
         }
         fprintf(fp, "\n");
+    }
+    return 0;
+}
+
+/**
+ * A function to setup the initial values for the boundaries based on the
+ * known heat sources. It is generic for most of the relaxations, for as long
+ * as the provided size accounts the boundaries.
+ */
+int relaxation_matrix_set(hw1_params_t* hw_params, double* mat, uint32_t np)
+{
+    uint32_t i, j;
+    double dist;
+
+    for( i = 0; i < hw_params->num_sources; i++ ) {
+        /**
+         * The heat dissipate linearly in cercles around the central
+         * point up to the defined range. It only affects the interface
+         * between the mediums, so it only has an impact on the boundaries.
+         */
+        for( j = 1; j < np-1; j++ ) {  /* initialize the top row */
+            dist = sqrt( pow((double)j/(double)(np-1) - 
+                             hw_params->heat_sources[i].x, 2) +
+                         pow(hw_params->heat_sources[i].y, 2));
+            if( dist <= hw_params->heat_sources[i].range ) {
+                mat[j] += ((hw_params->heat_sources[i].range - dist) /
+                           hw_params->heat_sources[i].range *
+                           hw_params->heat_sources[i].temp);
+            }
+        }
+        for( j = 1; j < np-1; j++ ) {  /* initialize the bottom row */
+            dist = sqrt( pow((double)j/(double)(np-1) - 
+                             hw_params->heat_sources[i].x, 2) +
+                         pow(1-hw_params->heat_sources[i].y, 2));
+            if( dist <= hw_params->heat_sources[i].range ) {
+                mat[(np-1)*np+j] += ((hw_params->heat_sources[i].range - dist) /
+                                     hw_params->heat_sources[i].range *
+                                     hw_params->heat_sources[i].temp);
+            }
+        }
+        for( j = 1; j < np-1; j++ ) {  /* left-most column */
+            dist = sqrt( pow(hw_params->heat_sources[i].x, 2) +
+                         pow((double)j/(double)(np-1) -
+                             hw_params->heat_sources[i].y, 2));
+            if( dist <= hw_params->heat_sources[i].range ) {
+                mat[j*np] += ((hw_params->heat_sources[i].range - dist) /
+                              hw_params->heat_sources[i].range *
+                              hw_params->heat_sources[i].temp);
+            }
+        }
+        for( j = 1; j < np-1; j++ ) {  /* right-most column */
+            dist = sqrt( pow(1-hw_params->heat_sources[i].x, 2) +
+                         pow((double)j/(double)(np-1) -
+                             hw_params->heat_sources[i].y, 2));
+            if( dist <= hw_params->heat_sources[i].range ) {
+                mat[j*np+(np-1)] += ((hw_params->heat_sources[i].range - dist) /
+                                     hw_params->heat_sources[i].range *
+                                     hw_params->heat_sources[i].temp);
+            }
+        }
     }
     return 0;
 }

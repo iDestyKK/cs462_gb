@@ -23,10 +23,11 @@ struct hw1_params_s;
 struct relaxation_params_s;
 typedef struct relaxation_params_s relaxation_params_t;
 
-#define RELAXATION_JACOBI 0
+#define RELAXATION_JACOBI       0
+#define RELAXATION_TEMPLATE     1
 struct relaxation_function_class_s {
-    int type;
-    int (*_init)(struct hw1_params_s*, relaxation_params_t*);
+    uint32_t type;
+    struct relaxation_params_s* (*_init)(struct hw1_params_s*);
     int (*_fini)(relaxation_params_t**);
     int (*_coarsen)(relaxation_params_t*, double*, uint32_t, uint32_t);
     int (*_print)(relaxation_params_t*, FILE*);
@@ -34,8 +35,6 @@ struct relaxation_function_class_s {
     double* (*_get_data)(relaxation_params_t*);
 };
 struct relaxation_params_s {
-    double* data[2];
-    uint32_t idx;
     uint32_t sizex;  /* total size of the matrix including the read-only borders */
     uint32_t sizey;
     const struct relaxation_function_class_s* rel_class;
