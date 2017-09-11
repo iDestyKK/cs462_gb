@@ -23,8 +23,10 @@ struct hw1_params_s;
 struct relaxation_params_s;
 typedef struct relaxation_params_s relaxation_params_t;
 
-#define RELAXATION_JACOBI       0
-#define RELAXATION_TEMPLATE     1
+#define RELAXATION_JACOBI             0
+#define RELAXATION_TEMPLATE           1
+#define RELAXATION_JACOBI_PTHREADS    2
+
 struct relaxation_function_class_s {
     uint32_t type;
     struct relaxation_params_s* (*_init)(struct hw1_params_s*);
