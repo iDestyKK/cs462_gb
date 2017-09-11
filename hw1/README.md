@@ -1,4 +1,4 @@
-Steps to add you algorithm into the provided skeleton. The relax_template.c is supposed to provide an example on how you can easily implement multiple relaxation algorithms using the same interface.
+Steps to add your algorithm into the provided skeleton. The relax_template.c is supposed to provide an example on how you can easily implement multiple relaxation algorithms using the same interface.
 
 All the following steps assumes you have the most recent copy of the homework and that your shell is in the directory hw1.
 
@@ -15,7 +15,7 @@ From now on if you modify the .dat examples and replace the line ```alg 0``` by 
 
 The elements in the configuration file (the .dat files) are fixed. The tester I provide will not understand anything that is not already there, and will therefore not be able to supply them to your algorithm. If you think there is a lack of support for some awesome feature, propose a patch via a pull request and we'll see.
 
-In any case the configuration file is loaded by the ```read_input_file``` function into a well defined structure, ```hw1_params_t```. This include the problem size you are executing as well as the number of threads that will be used (in the ```num_threads```). Your algorithm is expected to take this number in account and start the correct number of threads and put them all to work in the resolution of the Jacobi relaxation.
+In any case the configuration file is loaded by the ```read_input_file``` function into a well defined structure, ```hw1_params_t```. This includes the problem size you are executing as well as the number of threads that will be used (in the ```num_threads```). Your algorithm is expected to take this number in to account and start the correct number of threads and put them all to work in the resolution of the Jacobi relaxation.
 
 ### Initialization/execution/finalization
 
