@@ -1,6 +1,6 @@
 CC = gcc
 LD = gcc
-CFLAGS = -g3
+CFLAGS = -g3 -std=c11
 LDFLAGS = -g -lm
 #CFLAGS = -Wall -O3 -DNDEBUG
 #LDFLAGS = -O3
