@@ -1,0 +1,9 @@
+iter 1000
+alg 2 # Jacobi
+resolution 256
+threads 1
+vis_res 256
+vis_step 25
+numsrc 2
+0 0 0.5 200.25
+1 1 0.5 100.25
