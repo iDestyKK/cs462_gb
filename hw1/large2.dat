@@ -1,7 +1,7 @@
 iter 100000
 alg 2
 resolution 512
-threads 8
+threads 4
 vis_res 256
 vis_step 250
 numsrc 4
