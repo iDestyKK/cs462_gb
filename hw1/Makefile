@@ -1,7 +1,7 @@
 CC = gcc
 LD = gcc
-CFLAGS = -g3
-LDFLAGS = -g -lm -lpthread
+CFLAGS = -g3 -std=c11
+LDFLAGS = -g -lm
 #CFLAGS = -Wall -O3 -DNDEBUG
 #LDFLAGS = -O3
 AR = ar
