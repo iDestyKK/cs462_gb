@@ -27,15 +27,15 @@
 struct relaxation_pthread_hidden_params_s {
 	//Generic parametre
     struct relaxation_params_s super;
-    double*  data;
-	double*  tmp;
-	double   sum;
-    uint32_t idx;
-	char*    processable;
+    double*           data;
+	double*           tmp;
+	double            sum;
+    uint32_t          idx;
+	char              finish;
 
 	//Array of threads
-	uint32_t num_t;
-	uint32_t proc, proc2;
+	uint32_t          num_t;
+	uint32_t          proc, proc2;
 	pthread_t       * THRD_ARR;
 	struct arg_pair * pairs;
 	pthread_mutex_t   start, access, contin;
@@ -59,6 +59,13 @@ void* __FUNC(void* para) {
 
 		uint32_t i = parametre->val, j;
 		double diff, sum = 0.0;
+
+		pthread_mutex_lock(&rp->access);
+		if (rp->finish) {
+			pthread_mutex_unlock(&rp->access);
+			break;
+		}
+		pthread_mutex_unlock(&rp->access);
 
 		for (; i < rp->super.sizey - 1; i += rp->num_t) {
 			for (j = 1; j < rp->super.sizex - 1; j++) {
@@ -105,6 +112,7 @@ pthread_relaxation_init(struct hw1_params_s* hw_params)
     rp->super.sizex     = np;
     rp->super.sizey     = np;
     rp->super.rel_class = &_relaxation_pthread;
+	rp->finish          = 0;
 
 	pthread_mutex_init(&rp->start , NULL);
 	pthread_mutex_init(&rp->access, NULL);
@@ -134,6 +142,8 @@ pthread_relaxation_init(struct hw1_params_s* hw_params)
  fail_and_return:
     if( NULL != rp->data ) free(rp->data);
     if( NULL != rp->tmp  ) free(rp->tmp );
+	free(rp->THRD_ARR);
+	free(rp->pairs);
     free(rp);
     return NULL;
 }
@@ -141,6 +151,25 @@ pthread_relaxation_init(struct hw1_params_s* hw_params)
 static int pthread_relaxation_fini(relaxation_params_t** prp)
 {
     struct relaxation_pthread_hidden_params_s* rp = (struct relaxation_pthread_hidden_params_s*)*prp;
+	
+	//Set the indicator to tell the threads we are done
+	pthread_mutex_lock(&rp->access);
+	rp->finish = 1;
+	pthread_mutex_unlock(&rp->access);
+
+	//Activate every thread
+	pthread_mutex_unlock(&rp->start);
+	
+	//Ensure that all threads die off.
+	uint32_t i = 0;
+	for (; i < rp->num_t; i++) {
+		pthread_join(rp->THRD_ARR[i], NULL);
+	}
+
+	//Free everything, and save the day.
+	free(rp->THRD_ARR);
+	free(rp->pairs);
+
     if( NULL != rp->data ) free(rp->data);
     if( NULL != rp->tmp  ) free(rp->tmp );
     free(rp);
@@ -191,7 +220,10 @@ static double pthread_relaxation_apply(relaxation_params_t* grp)
 	}
 
 	//Copy over memory.
-	memcpy(rp->tmp, rp->data, rp->super.sizex * rp->super.sizey * sizeof(double));
+	//memcpy(rp->tmp, rp->data, rp->super.sizex * rp->super.sizey * sizeof(double));
+	double* tmpp = rp->tmp;
+	rp->tmp = rp->data;
+	rp->data = tmpp;
 	rp->proc2 = 0;
 	pthread_mutex_unlock(&rp->contin);
 

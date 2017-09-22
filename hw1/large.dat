@@ -1,5 +1,5 @@
 iter 100000
-resolution 512
+resolution 2560
 threads 7
 vis_res 256
 vis_step 250
