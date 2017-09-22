@@ -86,8 +86,8 @@ static double jacobi_relaxation_apply(relaxation_params_t* grp)
     n = rp->data[(rp->idx + 0) % 2];
     o = rp->data[(rp->idx + 1) % 2];
     /* The size[x,y] account for the boundary */
-    for( i = 1; i < (rp->super.sizex-1); i++ ) {
-        for( j = 1; j < (rp->super.sizey-1); j++ ) {
+    for( i = 1; i < (rp->super.sizey-1); i++ ) {
+        for( j = 1; j < (rp->super.sizex-1); j++ ) {
             n[i*rp->super.sizex+j] = 0.25 * (o[ i     * rp->super.sizex + (j-1) ]+  // left
                                        o[ i     * rp->super.sizex + (j+1) ]+  // right
                                        o[ (i-1) * rp->super.sizex + j     ]+  // top
