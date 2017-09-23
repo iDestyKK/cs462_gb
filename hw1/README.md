@@ -8,6 +8,12 @@ All the following steps assumes you have the most recent copy of the homework an
 - make a copy of relax\_template.c as relax\_bstudent.c (or any other name you prefer), and add it as a dependency to the libhw1.a line in the Makefile.
 - in relax\_bstudent.c replace all ```template``` by ```pthread_jacobi``` (or another name of your liking).
 - at the bottom of the file change the variable \_relaxation_pthread_jacobi (because of the name change in the previous step) to have the field ```.type``` set to RELAXATION\_JACOBI_PTHREADS.
+- in relaxation.c add the prototype of your algorithm and then add it to the _relaxation_classes. You should have something similar to:
+
+extern const struct relaxation_function_class_s _relaxation_pthread_jacobi;
+
+const struct relaxation_function_class_s const* _relaxation_classes[] =
+    {&_relaxation_jacobi, &_relaxation_template, &_relaxation_pthread_jacobi, NULL};
 
 From now on if you modify the .dat examples and replace the line ```alg 0``` by ```alg 2``` your algorithm will be called.
 
