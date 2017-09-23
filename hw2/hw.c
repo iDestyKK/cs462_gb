@@ -69,7 +69,7 @@ int read_input_file( hw_params_t* params )
             continue;
         }
         if( 0 == strncmp(cmd, "num_proc_p", 10) ) {
-            sscanf(cmd + 11, "%u", &params->num_sources);
+            sscanf(cmd + 11, "%u", &params->num_proc_p);
             continue;
         }
         params->heat_sources = (heat_source_t*)malloc(params->num_sources * sizeof(heat_source_t));
