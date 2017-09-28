@@ -40,7 +40,6 @@ const struct relaxation_function_class_s _relaxation_mpi;
 static struct relaxation_params_s*
 mpi_relaxation_init(struct hw_params_s* hw_params)
 {
-	MPI_Init(NULL, NULL);
     struct relaxation_mpi_hidden_params_s* rp;
     uint32_t np = hw_params->resolution + 2;
 
@@ -120,7 +119,6 @@ static int mpi_relaxation_fini(relaxation_params_t** prp)
     if( NULL != rp->data ) free(rp->data);
     free(rp);
     *prp = NULL;
-	MPI_Finalize();
     return 0;
 }
 
