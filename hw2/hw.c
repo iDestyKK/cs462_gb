@@ -217,11 +217,11 @@ int main(int argc, char* argv[] )
 
         residual = relaxation_apply(rp);
         /* print info on the residual */
-        if( (COSC462_HW_FLAG_VERBOSE & cosc462_hw_params.flags) && (0 == (iter % cosc462_hw_params.vis_step)) ) {
+        if( (COSC462_HW_FLAG_VERBOSE & cosc462_hw_params.flags) && (0 == (iter % cosc462_hw_params.vis_step)) && (0 == crank)) {
             fprintf(stderr, "Residual %lf\n", residual);
         }
         if( residual < EPSILON ) {  /* good enough */
-            if( COSC462_HW_FLAG_VERY_VERBOSE & cosc462_hw_params.flags ) {
+            if( COSC462_HW_FLAG_VERY_VERBOSE & cosc462_hw_params.flags && (0 == crank)) {
                 fprintf(stderr, "Complete after %d iterations with a residual %lf < %lf\n",
                         iter, residual, EPSILON );
             }
@@ -233,7 +233,7 @@ int main(int argc, char* argv[] )
         iter++;
     }
     elapsed = wtime() - start - ignore;
-    if( COSC462_HW_FLAG_TIME_ALG & cosc462_hw_params.flags ) {
+    if( COSC462_HW_FLAG_TIME_ALG & cosc462_hw_params.flags && (0 == crank) ) {
         printf("Completion in %ld microseconds\n", (unsigned long int)elapsed);
     }
     relaxation_fini(&rp);
