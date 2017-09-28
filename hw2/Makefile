@@ -13,7 +13,7 @@ lib: libhw2.a
 hw_tester: % : hw.o libhw.a
 	$(LD) -o hw_tester $^ $(LDFLAGS)
 
-libhw.a: relaxation.o relax_jacobi.o relax_template.o misc.o
+libhw.a: relaxation.o relax_jacobi.o relax_template.o relax_mpi.o misc.o
 	$(AR) cru libhw.a $^
 
 %.o: %.c jacobi.h header.h Makefile
