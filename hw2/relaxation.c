@@ -7,11 +7,11 @@
 
 extern const struct relaxation_function_class_s _relaxation_jacobi;
 extern const struct relaxation_function_class_s _relaxation_template;
-extern const struct relaxation_function_class_s _relaxation_pthread_jacobi;
+extern const struct relaxation_function_class_s _relaxation_pthread;
 extern const struct relaxation_function_class_s _relaxation_mpi;
 
 const struct relaxation_function_class_s * const _relaxation_classes[] =
-    {&_relaxation_jacobi, &_relaxation_template, NULL, &_relaxation_mpi};
+    {&_relaxation_jacobi, &_relaxation_template, &_relaxation_pthread, &_relaxation_mpi, NULL};
 
 relaxation_params_t* relaxation_init(struct hw_params_s* hw_params)
 {
@@ -21,8 +21,7 @@ relaxation_params_t* relaxation_init(struct hw_params_s* hw_params)
         if( _relaxation_classes[i]->type != hw_params->alg_type )
             continue;
         if( NULL == (rp =  _relaxation_classes[i]->_init(hw_params)) ) {
-			continue;
-            //return NULL;
+            return NULL;
         }
     }
     return rp;
