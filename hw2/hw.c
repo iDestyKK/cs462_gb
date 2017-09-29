@@ -188,7 +188,7 @@ int main(int argc, char* argv[] )
         fprintf(stderr, "Error initializing the relaxation. Bail out!\n");
         return -1;
     }
-    if( COSC462_HW_FLAG_GENERATE_HEAT_IMAGE & cosc462_hw_params.flags ) {
+    if( COSC462_HW_FLAG_GENERATE_HEAT_IMAGE & cosc462_hw_params.flags && 0 == crank) {
         relaxation_coarsen(rp, cosc462_hw_params.vis_data, cosc462_hw_params.vis_res, cosc462_hw_params.vis_res);
         dump_gray_image(cosc462_hw_params.vis_output, 0,
                         cosc462_hw_params.vis_data, cosc462_hw_params.vis_res, cosc462_hw_params.vis_res);

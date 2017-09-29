@@ -149,7 +149,7 @@ mpi_relaxation_init(struct hw_params_s* hw_params)
 	rp->max_size = MAX(rp->max_w, rp->max_h);
 	
 	//Construct the vector data type
-	MPI_Type_vector(rp->max_size + 2, sizeof(double), 0, MPI_DOUBLE, &rp->t1);
+	MPI_Type_vector(rp->max_size + 2, 1, 1, MPI_DOUBLE, &rp->t1);
 	MPI_Type_commit(&rp->t1);
 
 	//Create Region Data
@@ -365,7 +365,7 @@ static double mpi_relaxation_apply(relaxation_params_t* grp)
 	else {
 		for (i = 0; i < rp->size - 1; i++) {
 			double nsum = 0.0;
-			MPI_Recv(&nsum, 1, MPI_DOUBLE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			MPI_Recv(&nsum, 1, MPI_DOUBLE, i + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			rp->sum += nsum;
 		}
 	}
