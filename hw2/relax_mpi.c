@@ -38,6 +38,8 @@ struct relaxation_mpi_hidden_params_s {
 	//Adjacent IDs
 	size_t dir_inx[4];
 	size_t dir_inv[4];
+
+	double sum;
 };
 const struct relaxation_function_class_s _relaxation_mpi;
 
@@ -177,18 +179,20 @@ mpi_relaxation_init(struct hw_params_s* hw_params)
 		if (j < rp->p - 1) rp->region[ii].send_dir |= (1 << 2);
 		if (i < rp->q - 1) rp->region[ii].send_dir |= (1 << 3);
 
-		printf("%d:%c%c%c%c\n",
+		/*printf("%d:%c%c%c%c\n",
 			ii,
 			(rp->region[ii].send_dir     ) & 1 ? '^' : ' ',
 			(rp->region[ii].send_dir >> 1) & 1 ? '<' : ' ',
 			(rp->region[ii].send_dir >> 2) & 1 ? 'v' : ' ',
 			(rp->region[ii].send_dir >> 3) & 1 ? '>' : ' '
-		);
+		);*/
 	}
 
     rp->idx = 0;
     rp->data = calloc(np*np, sizeof(double));
     rp->tmp  = calloc(np*np, sizeof(double));
+    relaxation_matrix_set(hw_params, rp->data, np);
+	memcpy(rp->tmp, rp->data, np * np * sizeof(double));
 
 	rp->dir_inx[0] = rp->rank - rp->q;
 	rp->dir_inx[1] = rp->rank - 1;
@@ -250,7 +254,7 @@ static double mpi_relaxation_apply(relaxation_params_t* grp)
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	unsigned char jk;
-	uint32_t i;
+	uint32_t i, j;
 	AREA* cr =  &rp->region[rp->rank];
 
 	//Send first. Update the edges of all nodes.
@@ -265,10 +269,10 @@ static double mpi_relaxation_apply(relaxation_params_t* grp)
 			MPI_Status  sta;
 			MPI_Isend(vec, 1, rp->t1, rp->dir_inx[jk], 0, MPI_COMM_WORLD, &req);
 			MPI_Wait(&req, &sta);
-			printf("Send:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
-			for (i = 0; i < vec[0]; i++)
-				printf("%lg ", vec[2 + i]);
-			printf("\nlolsent\n");
+			//printf("Send:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
+			//for (i = 0; i < vec[0]; i++)
+			//	printf("%lg ", vec[2 + i]);
+			//printf("\nlolsent\n");
 			free(vec);
 		}
 
@@ -284,11 +288,11 @@ static double mpi_relaxation_apply(relaxation_params_t* grp)
 			MPI_Irecv(vec, 1, rp->t1, rp->dir_inv[jk], 0, MPI_COMM_WORLD, &req);
 			MPI_Wait(&req, &sta);
 			//MPI_Recv(vec, 1, t1, dir_inv[jk], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			printf("Recv:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
-			for (i = 0; i < vec[0]; i++) {
-				printf("%lg ", vec[2 + i]);
-			}
-			printf("\nloltrue\n");
+			//printf("Recv:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
+			//for (i = 0; i < vec[0]; i++) {
+			//	printf("%lg ", vec[2 + i]);
+			//}
+			//printf("\nloltrue\n");
 			append_vector(rp, vec);
 			free(vec);
 		}
@@ -306,11 +310,11 @@ static double mpi_relaxation_apply(relaxation_params_t* grp)
 			MPI_Irecv(vec, 1, rp->t1, rp->dir_inv[jk], 0, MPI_COMM_WORLD, &req);
 			MPI_Wait(&req, &sta);
 			//MPI_Recv(vec, 1, t1, dir_inv[jk], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			printf("Recv:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
-			for (i = 0; i < vec[0]; i++) {
-				printf("%lg ", vec[2 + i]);
-			}
-			printf("\nloltrue\n");
+			//printf("Recv:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
+			//for (i = 0; i < vec[0]; i++) {
+			//	printf("%lg ", vec[2 + i]);
+			//}
+			//printf("\nloltrue\n");
 			append_vector(rp, vec);
 			free(vec);
 		}
@@ -324,18 +328,62 @@ static double mpi_relaxation_apply(relaxation_params_t* grp)
 			MPI_Status  sta;
 			MPI_Isend(vec, 1, rp->t1, rp->dir_inx[jk], 0, MPI_COMM_WORLD, &req);
 			MPI_Wait(&req, &sta);
-			printf("Send:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
-			for (i = 0; i < vec[0]; i++)
-				printf("%lg ", vec[2 + i]);
-			printf("\nlolsent\n");
+			//printf("Send:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
+			//for (i = 0; i < vec[0]; i++)
+			//	printf("%lg ", vec[2 + i]);
+			//printf("\nlolsent\n");
 			free(vec);
 		}
 	}
-
-    fprintf(stdout, "This is only a mpi relaxation class. No computations are done!\n");
-    rp->idx++;
 	MPI_Barrier(MPI_COMM_WORLD);
-    return 0.0;
+
+	//Calculate data
+	double diff;
+	rp->sum = 0.0;
+	for (i = MAX(1, cr->y); i < MIN(cr->y + cr->h, rp->h - 1); i++) {
+		for (j = MAX(1, cr->x); j < MIN(cr->x + cr->w, rp->w - 1); j++) {
+			rp->tmp[i * rp->super.sizex + j] = 0.25 * (
+				rp->data[ i      * rp->w + (j - 1)] +
+				rp->data[ i      * rp->w + (j + 1)] +
+				rp->data[(i - 1) * rp->w +  j     ] +
+				rp->data[(i + 1) * rp->w +  j     ]
+			);
+			
+			diff = rp->tmp[i * rp->w + j] - rp->data[i * rp->w + j];
+			rp->sum += diff * diff;
+		}
+	}
+
+	//Copy memory over
+	double* tmp = rp->tmp;
+	rp->tmp = rp->data;
+	rp->data = tmp;
+
+	//Send Results to the first node and let it total them up.
+	if (rp->rank != 0)
+		MPI_Send(&rp->sum, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+	else {
+		for (i = 0; i < rp->size - 1; i++) {
+			double nsum = 0.0;
+			MPI_Recv(&nsum, 1, MPI_DOUBLE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			rp->sum += nsum;
+		}
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	
+	//Send those results to the others.
+	if (rp->rank == 0)
+		for (i = 1; i < rp->size; i++)
+			MPI_Send(&rp->sum, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+	else
+		MPI_Recv(&rp->sum, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+    rp->idx++;
+
+    return rp->sum;
 }
 
 static double* mpi_relaxation_get_data(relaxation_params_t* grp)
