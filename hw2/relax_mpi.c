@@ -34,8 +34,88 @@ struct relaxation_mpi_hidden_params_s {
 
 	struct area* region; //Array of region details for the image
 	MPI_Datatype t1;     //Vector datatype
+
+	//Adjacent IDs
+	size_t dir_inx[4];
+	size_t dir_inv[4];
 };
 const struct relaxation_function_class_s _relaxation_mpi;
+
+//Helper Functions for sending and receiving data about the matrix entries
+void append_vector(struct relaxation_mpi_hidden_params_s* rp, double* vec) {
+	//0b0000NWSE
+	AREA *cr = &rp->region[rp->rank];
+
+	//Direction and length are defined in the vector
+	unsigned char dir = (int)vec[1];
+	unsigned int  len =      vec[0],
+	              i   = 0,
+	              j   = 2;
+	
+	//NOTE: These are flipped versions of the "generate_vector" sister function.
+	switch (dir) {
+		case 0:
+			//South
+			for (i = cr->x; i < cr->x + cr->w && vec[j] != -1; i++)
+				rp->data[((cr->y + cr->h) * rp->w) + i] = vec[j++];
+			break;
+		case 1:
+			//East
+			for (i = cr->y; i < cr->y + cr->h && vec[j] != -1; i++)
+				rp->data[(i * rp->w) + cr->x + cr->w] = vec[j++];
+			break;
+		case 2:
+			//North
+			for (i = cr->x; i < cr->x + cr->w && vec[j] != -1; i++)
+				rp->data[((cr->y - 1) * rp->w) + i] = vec[j++];
+			break;
+		case 3:
+			//West
+			for (i = cr->y; i < cr->y + cr->h && vec[j] != -1; i++)
+				rp->data[(i * rp->w) + (cr->x - 1)] = vec[j++];
+			break;
+	}
+}
+
+double* generate_vector(struct relaxation_mpi_hidden_params_s* rp, int dir) {
+	//0b0000NWSE
+	//Store the vector size and direction before the data
+	double* vec = (double *)malloc(sizeof(double) * (rp->max_size + 2));
+	AREA *cr = &rp->region[rp->rank];
+
+	vec[0] = ((dir % 2) == 0) ? cr->w : cr->h;
+	vec[1] = dir;
+	
+	unsigned int i, j = 2;
+	switch (dir) {
+		case 0:
+			//North
+			for (i = cr->x; i < cr->x + cr->w; i++)
+				vec[j++] = rp->data[(cr->y * rp->w) + i];
+			break;
+		case 1:
+			//West
+			for (i = cr->y; i < cr->y + cr->h; i++)
+				vec[j++] = rp->data[(i * rp->w) + cr->x];
+			break;
+		case 2:
+			//South
+			for (i = cr->x; i < cr->x + cr->w; i++)
+				vec[j++] = rp->data[((cr->y + cr->h - 1) * rp->w) + i];
+			break;
+		case 3:
+			//East
+			for (i = cr->y; i < cr->y + cr->h; i++)
+				vec[j++] = rp->data[(i * rp->w) + (cr->x + cr->w - 1)];
+			break;
+	}
+
+	//Make a "-1" terminator (just in case)
+	if (j != rp->max_size + 2)
+		vec[j++] = -1;
+	
+	return vec;
+}
 
 static struct relaxation_params_s*
 mpi_relaxation_init(struct hw_params_s* hw_params)
@@ -64,9 +144,10 @@ mpi_relaxation_init(struct hw_params_s* hw_params)
 	rp->h = np;
 	rp->max_w = (rp->w / rp->q) + (rp->w % rp->q);
 	rp->max_h = (rp->h / rp->p) + (rp->h % rp->p);
+	rp->max_size = MAX(rp->max_w, rp->max_h);
 	
 	//Construct the vector data type
-	MPI_Type_vector(MAX(rp->max_w, rp->max_h) + 2, sizeof(double), 0, MPI_DOUBLE, &rp->t1);
+	MPI_Type_vector(rp->max_size + 2, sizeof(double), 0, MPI_DOUBLE, &rp->t1);
 	MPI_Type_commit(&rp->t1);
 
 	//Create Region Data
@@ -81,7 +162,7 @@ mpi_relaxation_init(struct hw_params_s* hw_params)
 
 		//Set up a region
 		rp->region[ii].x = i * (rp->w / rp->q);
-		rp->region[ii].y = i * (rp->h / rp->p);
+		rp->region[ii].y = j * (rp->h / rp->p);
 		rp->region[ii].w = vx;
 		rp->region[ii].h = vy;
 		if (i == 0)
@@ -94,12 +175,30 @@ mpi_relaxation_init(struct hw_params_s* hw_params)
 		if (j >         0) rp->region[ii].send_dir |= (1 << 0);
 		if (i >         0) rp->region[ii].send_dir |= (1 << 1);
 		if (j < rp->p - 1) rp->region[ii].send_dir |= (1 << 2);
-		if (j < rp->q - 1) rp->region[ii].send_dir |= (1 << 3);
+		if (i < rp->q - 1) rp->region[ii].send_dir |= (1 << 3);
+
+		printf("%d:%c%c%c%c\n",
+			ii,
+			(rp->region[ii].send_dir     ) & 1 ? '^' : ' ',
+			(rp->region[ii].send_dir >> 1) & 1 ? '<' : ' ',
+			(rp->region[ii].send_dir >> 2) & 1 ? 'v' : ' ',
+			(rp->region[ii].send_dir >> 3) & 1 ? '>' : ' '
+		);
 	}
 
     rp->idx = 0;
     rp->data = calloc(np*np, sizeof(double));
     rp->tmp  = calloc(np*np, sizeof(double));
+
+	rp->dir_inx[0] = rp->rank - rp->q;
+	rp->dir_inx[1] = rp->rank - 1;
+	rp->dir_inx[2] = rp->rank + rp->q;
+	rp->dir_inx[3] = rp->rank + 1;
+
+	rp->dir_inv[0] = rp->dir_inx[2];
+	rp->dir_inv[1] = rp->dir_inx[3];
+	rp->dir_inv[2] = rp->dir_inx[0];
+	rp->dir_inv[3] = rp->dir_inx[1];
 	
     if( NULL == rp->data ) {
         fprintf(stderr, "Cannot allocate the memory for the matrices\n");
@@ -116,6 +215,10 @@ mpi_relaxation_init(struct hw_params_s* hw_params)
 static int mpi_relaxation_fini(relaxation_params_t** prp)
 {
     struct relaxation_mpi_hidden_params_s* rp = (struct relaxation_mpi_hidden_params_s*)*prp;
+	
+
+
+
     if( NULL != rp->data ) free(rp->data);
     free(rp);
     *prp = NULL;
@@ -144,8 +247,94 @@ static int mpi_relaxation_print(relaxation_params_t* grp, FILE* fp)
 static double mpi_relaxation_apply(relaxation_params_t* grp)
 {
     struct relaxation_mpi_hidden_params_s* rp = (struct relaxation_mpi_hidden_params_s*)grp;
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	unsigned char jk;
+	uint32_t i;
+	AREA* cr =  &rp->region[rp->rank];
+
+	//Send first. Update the edges of all nodes.
+	if (cr->colour == 0) {
+		for (jk = 0; jk < 4; jk++) {
+			if (!(cr->send_dir & (1 << jk)))
+				continue;
+
+			double* vec = generate_vector(rp, jk);
+
+			MPI_Request req;
+			MPI_Status  sta;
+			MPI_Isend(vec, 1, rp->t1, rp->dir_inx[jk], 0, MPI_COMM_WORLD, &req);
+			MPI_Wait(&req, &sta);
+			printf("Send:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
+			for (i = 0; i < vec[0]; i++)
+				printf("%lg ", vec[2 + i]);
+			printf("\nlolsent\n");
+			free(vec);
+		}
+
+		for (jk = 0; jk < 4; jk++) {
+			//Invert the send_dir bits
+			char send_d = ((cr->send_dir & 0x3) << 2) + (cr->send_dir >> 2);
+
+			if (!(send_d & (1 << jk)))
+				continue;
+			double* vec = (double*) malloc(sizeof(double) * (rp->max_size + 2));
+			MPI_Request req;
+			MPI_Status  sta;
+			MPI_Irecv(vec, 1, rp->t1, rp->dir_inv[jk], 0, MPI_COMM_WORLD, &req);
+			MPI_Wait(&req, &sta);
+			//MPI_Recv(vec, 1, t1, dir_inv[jk], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			printf("Recv:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
+			for (i = 0; i < vec[0]; i++) {
+				printf("%lg ", vec[2 + i]);
+			}
+			printf("\nloltrue\n");
+			append_vector(rp, vec);
+			free(vec);
+		}
+	}
+	else {
+		for (jk = 0; jk < 4; jk++) {
+			//Invert the send_dir bits
+			char send_d = ((cr->send_dir & 0x3) << 2) + (cr->send_dir >> 2);
+
+			if (!(send_d & (1 << jk)))
+				continue;
+			double* vec = (double*) malloc(sizeof(double) * (rp->max_size + 2));
+			MPI_Request req;
+			MPI_Status  sta;
+			MPI_Irecv(vec, 1, rp->t1, rp->dir_inv[jk], 0, MPI_COMM_WORLD, &req);
+			MPI_Wait(&req, &sta);
+			//MPI_Recv(vec, 1, t1, dir_inv[jk], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			printf("Recv:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
+			for (i = 0; i < vec[0]; i++) {
+				printf("%lg ", vec[2 + i]);
+			}
+			printf("\nloltrue\n");
+			append_vector(rp, vec);
+			free(vec);
+		}
+		for (jk = 0; jk < 4; jk++) {
+			if (!(cr->send_dir & (1 << jk)))
+				continue;
+
+			double* vec = generate_vector(rp, jk);
+
+			MPI_Request req;
+			MPI_Status  sta;
+			MPI_Isend(vec, 1, rp->t1, rp->dir_inx[jk], 0, MPI_COMM_WORLD, &req);
+			MPI_Wait(&req, &sta);
+			printf("Send:%d: %lg %lg ", rp->rank, vec[0], vec[1]);
+			for (i = 0; i < vec[0]; i++)
+				printf("%lg ", vec[2 + i]);
+			printf("\nlolsent\n");
+			free(vec);
+		}
+	}
+
     fprintf(stdout, "This is only a mpi relaxation class. No computations are done!\n");
     rp->idx++;
+	MPI_Barrier(MPI_COMM_WORLD);
     return 0.0;
 }
 
