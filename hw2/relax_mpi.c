@@ -33,7 +33,8 @@ struct relaxation_mpi_hidden_params_s {
 	         max_size;   //Max size to allocate vectors (minus 2)
 
 	struct area* region; //Array of region details for the image
-	MPI_Datatype t1;     //Vector datatype
+	MPI_Datatype t1,     //Vector datatype (Rows & Columns)
+	             t2;     //Vector datatype (Pixel Data)
 
 	//Adjacent IDs
 	size_t dir_inx[4];
@@ -148,9 +149,11 @@ mpi_relaxation_init(struct hw_params_s* hw_params)
 	rp->max_h = (rp->h / rp->p) + (rp->h % rp->p);
 	rp->max_size = MAX(rp->max_w, rp->max_h);
 	
-	//Construct the vector data type
+	//Construct the vector data types
 	MPI_Type_vector(rp->max_size + 2, 1, 1, MPI_DOUBLE, &rp->t1);
 	MPI_Type_commit(&rp->t1);
+	MPI_Type_vector((rp->max_size * rp->max_size) + 2, 1, 1, MPI_DOUBLE, &rp->t2);
+	MPI_Type_commit(&rp->t2);
 
 	//Create Region Data
 	rp->region = (AREA *) malloc(rp->q * rp->p * sizeof(struct area));
@@ -211,7 +214,9 @@ mpi_relaxation_init(struct hw_params_s* hw_params)
 
     return (struct relaxation_params_s*)rp;
  fail_and_return:
-    if( NULL != rp->data ) free(rp->data);
+    if( NULL != rp->data  ) free(rp->data  );
+    if( NULL != rp->tmp   ) free(rp->tmp   );
+    if( NULL != rp->region) free(rp->region);
     free(rp);
     return NULL;
 }
@@ -220,10 +225,9 @@ static int mpi_relaxation_fini(relaxation_params_t** prp)
 {
     struct relaxation_mpi_hidden_params_s* rp = (struct relaxation_mpi_hidden_params_s*)*prp;
 	
-
-
-
-    if( NULL != rp->data ) free(rp->data);
+    if( NULL != rp->data  ) free(rp->data  );
+    if( NULL != rp->tmp   ) free(rp->tmp   );
+    if( NULL != rp->region) free(rp->region);
     free(rp);
     *prp = NULL;
     return 0;
@@ -337,8 +341,11 @@ static double mpi_relaxation_apply(relaxation_params_t* grp)
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	//Calculate data
+	//Calculate data, and write it to vector to send to root node
 	double diff;
+	uint32_t pb_j = 2;
+	double* vec_px = (double *) calloc((rp->max_size * rp->max_size) + 2, sizeof(double));
+	vec_px[1] = rp->rank;
 	rp->sum = 0.0;
 	for (i = MAX(1, cr->y); i < MIN(cr->y + cr->h, rp->h - 1); i++) {
 		for (j = MAX(1, cr->x); j < MIN(cr->x + cr->w, rp->w - 1); j++) {
@@ -348,11 +355,14 @@ static double mpi_relaxation_apply(relaxation_params_t* grp)
 				rp->data[(i - 1) * rp->w +  j     ] +
 				rp->data[(i + 1) * rp->w +  j     ]
 			);
+
+			vec_px[pb_j++] = rp->tmp[i * rp->super.sizex + j];
 			
 			diff = rp->tmp[i * rp->w + j] - rp->data[i * rp->w + j];
 			rp->sum += diff * diff;
 		}
 	}
+	vec_px[0] = pb_j - 2;
 
 	//Copy memory over
 	double* tmp = rp->tmp;
@@ -368,6 +378,30 @@ static double mpi_relaxation_apply(relaxation_params_t* grp)
 			MPI_Recv(&nsum, 1, MPI_DOUBLE, i + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			rp->sum += nsum;
 		}
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	//Now let's update the root node's pixels to fully complete the image.
+	if (rp->rank != 0) {
+		MPI_Send(vec_px, 1, rp->t2, 0, 0, MPI_COMM_WORLD);
+		free(vec_px);
+	}
+	else {
+		uint32_t k = 0;
+		for (; k < rp->size - 1; k++) {
+			MPI_Recv(vec_px, 1, rp->t2, k + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+			AREA* cr = &rp->region[k + 1];
+			uint32_t _len = vec_px[0], l = 0;
+
+			for (i = MAX(1, cr->y); i < MIN(cr->y + cr->h, rp->h - 1); i++) {
+				for (j = MAX(1, cr->x); j < MIN(cr->x + cr->w, rp->w - 1); j++) {
+					rp->data[i * rp->super.sizex + j] = vec_px[(l++) + 2];
+				}
+			}
+		}
+		free(vec_px);
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
