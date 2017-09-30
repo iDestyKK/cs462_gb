@@ -157,8 +157,8 @@ mpi_relaxation_init(struct hw_params_s* hw_params)
 	uint32_t ii = 0;
 	for (; ii < rp->q * rp->p; ii++) {
 		unsigned int vx, vy, i, j;
-		i = ii % rp->p;
-		j = ii / rp->p;
+		i = ii % rp->q;
+		j = ii / rp->q;
 		vx = (i == rp->q - 1) ? rp->max_w : rp->w / rp->q;
 		vy = (j == rp->p - 1) ? rp->max_h : rp->h / rp->p;
 
