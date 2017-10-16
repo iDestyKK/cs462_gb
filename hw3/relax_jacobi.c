@@ -13,7 +13,8 @@ struct relaxation_jacobi_hidden_params_s {
 const struct relaxation_function_class_s _relaxation_jacobi;
 
 static struct relaxation_params_s*
-jacobi_relaxation_init(struct hw3_params_s* hw_params) {
+jacobi_relaxation_init(struct hw_params_s* hw_params)
+{
     struct relaxation_jacobi_hidden_params_s* rp;
     uint32_t np = hw_params->resolution + 2;
 
@@ -40,7 +41,6 @@ jacobi_relaxation_init(struct hw3_params_s* hw_params) {
     memcpy(rp->data[1], rp->data[0], np*np*sizeof(double));
 
     return (struct relaxation_params_s*)rp;
-
  fail_and_return:
     if (NULL != rp->data[0]) free(rp->data[0]);
     if (NULL != rp->data[1]) free(rp->data[1]);
@@ -48,8 +48,8 @@ jacobi_relaxation_init(struct hw3_params_s* hw_params) {
     return NULL;
 }
 
-static int
-jacobi_relaxation_fini(relaxation_params_t** prp) {
+static int jacobi_relaxation_fini(relaxation_params_t** prp)
+{
     struct relaxation_jacobi_hidden_params_s* rp = (struct relaxation_jacobi_hidden_params_s*)*prp;
     if (NULL != rp->data[0]) free(rp->data[0]);
     if (NULL != rp->data[1]) free(rp->data[1]);
@@ -58,14 +58,15 @@ jacobi_relaxation_fini(relaxation_params_t** prp) {
     return 0;
 }
 
-static int
-jacobi_relaxation_coarsen(relaxation_params_t* grp, double* dst, uint32_t dstx, uint32_t dsty) {
+static int jacobi_relaxation_coarsen(relaxation_params_t* grp, double* dst, uint32_t dstx, uint32_t dsty)
+{
     struct relaxation_jacobi_hidden_params_s* rp = (struct relaxation_jacobi_hidden_params_s*)grp;
-    return coarsen(rp->data[(rp->idx + 1) % 2], rp->super.sizex, rp->super.sizey, dst, dstx, dsty);
+    return coarsen(rp->data[(rp->idx + 1) % 2], rp->super.sizex, rp->super.sizey,
+                   dst, dstx, dsty);
 }
 
-static int
-jacobi_relaxation_print(relaxation_params_t* grp, FILE* fp) {
+static int jacobi_relaxation_print(relaxation_params_t* grp, FILE* fp)
+{
     struct relaxation_jacobi_hidden_params_s* rp = (struct relaxation_jacobi_hidden_params_s*)grp;
     fprintf( fp, "\n# Iteration %d\n", rp->idx);
     print_matrix(fp, rp->data[(rp->idx + 1) % 2], rp->super.sizex, rp->super.sizey);
@@ -76,8 +77,8 @@ jacobi_relaxation_print(relaxation_params_t* grp, FILE* fp) {
 /**
  * One step of a simple Jacobi relaxation.
  */
-static double
-jacobi_relaxation_apply(relaxation_params_t* grp) {
+static double jacobi_relaxation_apply(relaxation_params_t* grp)
+{
     struct relaxation_jacobi_hidden_params_s* rp = (struct relaxation_jacobi_hidden_params_s*)grp;
     double diff, sum = 0.0, *n, *o;
     int i, j;
@@ -99,13 +100,15 @@ jacobi_relaxation_apply(relaxation_params_t* grp) {
     return sum;
 }
 
-static double*
-jacobi_relaxation_get_data(relaxation_params_t* grp) {
+static double* jacobi_relaxation_get_data(relaxation_params_t* grp)
+{
     struct relaxation_jacobi_hidden_params_s* rp = (struct relaxation_jacobi_hidden_params_s*)grp;
     return rp->data[(rp->idx + 1) % 2];
 }
 
-const struct relaxation_function_class_s _relaxation_jacobi = {
+
+const struct relaxation_function_class_s _relaxation_jacobi =
+    {
     .type = RELAXATION_JACOBI,
     ._init = jacobi_relaxation_init,
     ._fini = jacobi_relaxation_fini,

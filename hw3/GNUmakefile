@@ -1,7 +1,7 @@
 # -*- Makefile -*-
 
 CC = gcc
-CFLAGS ?= -g3 -Wall -std=c11 -D_GNU_SOURCE -pipe
+CFLAGS ?= -g3 -Wall -std=c11 -D_GNU_SOURCE -pipe -fPIC
 
 LD = $(CC)
 LDFLAGS = -g
@@ -15,7 +15,7 @@ all: hw3_tester
 
 lib: libhw3.a
 
-hw3_tester: % : hw3.o libhw3.a
+hw3_tester: % : hw.o libhw3.a
 	$(LD) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 libhw3.a: relaxation.o relax_jacobi.o relax_template.o misc.o

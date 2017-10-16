@@ -30,7 +30,7 @@ typedef struct heat_source_s {
     double temp;
 } heat_source_t;
 
-typedef struct hw3_params_s {
+typedef struct hw_params_s {
     uint32_t alg_type;
     uint32_t max_iterations;  /* leave to 0 to only stop on residual */
     uint32_t resolution;
@@ -46,10 +46,10 @@ typedef struct hw3_params_s {
     double *vis_data;
     uint32_t num_sources;
     heat_source_t* heat_sources;
-} hw3_params_t;
+} hw_params_t;
 
-int hw3_init(hw3_params_t* param, int32_t* argc, char* argv[]);
-int hw3_fini(hw3_params_t* param);
+int hw3_init(hw_params_t* param, int32_t* argc, char* argv[]);
+int hw3_fini(hw_params_t* param);
 
 /**
  * Transform, coarsen, a matrix by agragating several point
@@ -64,7 +64,7 @@ int coarsen(const double* src, uint32_t srcx, uint32_t srcy,
  * known heat sources. It is generic for most of the relaxations, for as long
  * as the provided size accounts the boundaries.
  */
-int relaxation_matrix_set(hw3_params_t* hw_params, double* mat, uint32_t np);
+int relaxation_matrix_set(hw_params_t* hw_params, double* mat, uint32_t np);
 
 /**
  * The number of differewnt values of gray in the output image */

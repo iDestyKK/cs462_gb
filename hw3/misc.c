@@ -11,23 +11,21 @@
  *
  * $HEADER$
  */
-
-#include <float.h>
-#include <limits.h>
-#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "header.h"
-static double coarsen_block( const double* src, int posx, int posy, int ldsrc, int ncols, int nrows ) {
+static double coarsen_block( const double* src, int posx, int posy, int ldsrc, int ncols, int nrows )
+{
     double val = 0.0;
     const double* mat;
     int i, j;
 
     mat = src + posy * ldsrc + posx;
-    for (j = 0; j < nrows; ++j) {
-        for (i = 0; i < ncols; ++i) {
+    for( j = 0; j < nrows; j++ ) {
+        for( i = 0; i < ncols; i++ ) {
             val += mat[i];
         }
         mat += ldsrc;
@@ -40,9 +38,9 @@ static double coarsen_block( const double* src, int posx, int posy, int ldsrc, i
  * in 2D into a single element. This can be used to prepare
  * the output matrix for generating the graphical visualization.
  */
-int
-coarsen(const double* src, uint32_t src_rows, uint32_t src_cols,
-            double* dst, uint32_t dst_rows, uint32_t dst_cols) {
+int coarsen(const double* src, uint32_t src_rows, uint32_t src_cols,
+            double* dst, uint32_t dst_rows, uint32_t dst_cols)
+{
     uint32_t i, j, maxx, maxy, pos_src_x, pos_src_y;
     uint32_t stepx, stepy;
 
@@ -51,7 +49,7 @@ coarsen(const double* src, uint32_t src_rows, uint32_t src_cols,
 
     pos_src_x = 1;
     /* The borders are critical, minimize the coarsening to a single dimension. */
-    for (i = 1; i < (dst_cols-1); ++i) {  /* top and bottom */
+    for( i = 1; i < (dst_cols-1); i++ ) {  /* top and bottom */
         maxx = stepx;
         if ((pos_src_x + maxx) > (src_cols - 1))
             maxx = src_cols - 1 - pos_src_x;
@@ -60,7 +58,7 @@ coarsen(const double* src, uint32_t src_rows, uint32_t src_cols,
         pos_src_x += maxx;
     }
     pos_src_y = 1;
-    for (j = 1; j < (dst_rows-1); ++j) {  /* left and right */
+    for( j = 1; j < (dst_rows-1); j++ ) {  /* left and right */
         maxy = stepy;
         if ((pos_src_y + maxy) > (src_rows - 1))
             maxx = src_rows - 1 - pos_src_y;
@@ -69,27 +67,29 @@ coarsen(const double* src, uint32_t src_rows, uint32_t src_cols,
         pos_src_y += maxy;
     }
     pos_src_x = 1;
-    for (i = 1; i < (dst_cols-1); ++i) {
+    for( i = 1; i < (dst_cols-1); i++ ) {
         maxx = stepx;
         if ((pos_src_x + maxx) > (src_cols - 1))
             maxx = src_cols - 1 - pos_src_x;
         pos_src_y = 1;
-        for (j = 1; j < (dst_rows-1); ++j) {
+        for( j = 1; j < (dst_rows-1); j++ ) {
             maxy = stepy;
             if ((pos_src_y + maxy) > (src_rows - 1))
                 maxx = src_rows - 1 - pos_src_y;
             dst[j*dst_cols+i] = coarsen_block( src, pos_src_x, pos_src_y, src_cols, maxx, maxy);
-            pos_src_y += maxy; 
+            pos_src_y += maxy;
         }
         pos_src_x += maxx;
     }
     return 0;
 }
 
-int
-print_matrix( FILE* fp, const double* mat, int sizex, int sizey ) {
-    for (int j = 0; j < sizey; ++j) {
-        for (int i = 0; i < sizex; ++i) {
+int print_matrix( FILE* fp, const double* mat, int sizex, int sizey )
+{
+    int i, j;
+
+    for( j = 0; j < sizey; j++ ) {
+        for( i = 0; i < sizex; i++ ) {
             fprintf(fp, "%8.4lf", mat[j * sizex + i]);
         }
         fprintf(fp, "\n");
@@ -103,18 +103,18 @@ print_matrix( FILE* fp, const double* mat, int sizex, int sizey ) {
  * as the provided size accounts the boundaries.
  */
 int
-relaxation_matrix_set(hw3_params_t* hw_params, double* mat, uint32_t np) {
+relaxation_matrix_set(hw_params_t* hw_params, double* mat, uint32_t np) {
     uint32_t i, j;
     double dist;
 
-    for (i = 0; i < hw_params->num_sources; ++i) {
+    for( i = 0; i < hw_params->num_sources; i++ ) {
         /**
          * The heat dissipate linearly in cercles around the central
          * point up to the defined range. It only affects the interface
          * between the mediums, so it only has an impact on the boundaries.
          */
-        for (j = 1; j < np-1; ++j) {  /* initialize the top row */
-            dist = sqrt( pow((double)j/(double)(np-1) - 
+        for( j = 1; j < np-1; j++ ) {  /* initialize the top row */
+            dist = sqrt( pow((double)j/(double)(np-1) -
                              hw_params->heat_sources[i].x, 2) +
                          pow(hw_params->heat_sources[i].y, 2));
             if (dist <= hw_params->heat_sources[i].range) {
@@ -123,8 +123,8 @@ relaxation_matrix_set(hw3_params_t* hw_params, double* mat, uint32_t np) {
                            hw_params->heat_sources[i].temp);
             }
         }
-        for (j = 1; j < np-1; ++j) {  /* initialize the bottom row */
-            dist = sqrt( pow((double)j/(double)(np-1) - 
+        for( j = 1; j < np-1; j++ ) {  /* initialize the bottom row */
+            dist = sqrt( pow((double)j/(double)(np-1) -
                              hw_params->heat_sources[i].x, 2) +
                          pow(1-hw_params->heat_sources[i].y, 2));
             if (dist <= hw_params->heat_sources[i].range) {
@@ -133,7 +133,7 @@ relaxation_matrix_set(hw3_params_t* hw_params, double* mat, uint32_t np) {
                                      hw_params->heat_sources[i].temp);
             }
         }
-        for (j = 1; j < np-1; ++j) {  /* left-most column */
+        for( j = 1; j < np-1; j++ ) {  /* left-most column */
             dist = sqrt( pow(hw_params->heat_sources[i].x, 2) +
                          pow((double)j/(double)(np-1) -
                              hw_params->heat_sources[i].y, 2));
@@ -143,7 +143,7 @@ relaxation_matrix_set(hw3_params_t* hw_params, double* mat, uint32_t np) {
                               hw_params->heat_sources[i].temp);
             }
         }
-        for (j = 1; j < np-1; ++j) {  /* right-most column */
+        for( j = 1; j < np-1; j++ ) {  /* right-most column */
             dist = sqrt( pow(1-hw_params->heat_sources[i].x, 2) +
                          pow((double)j/(double)(np-1) -
                              hw_params->heat_sources[i].y, 2));
@@ -157,12 +157,18 @@ relaxation_matrix_set(hw3_params_t* hw_params, double* mat, uint32_t np) {
     return 0;
 }
 
+#include <float.h>
+#include <limits.h>
+
+#include "header.h"
+
 /**
  * Dump a matrix into a gray pgm format.
  * http://netpbm.sourceforge.net/doc/pgm.html
  */
-int
-dump_gray_image(char* template_name, int iter, double* data, uint32_t sizex, uint32_t sizey) {
+int dump_gray_image(char* template_name, int iter,
+                    double* data, uint32_t sizex, uint32_t sizey)
+{
     double min = DBL_MAX, max = DBL_MIN, factor;
     int i, j;
     int16_t *val16;
@@ -177,7 +183,7 @@ dump_gray_image(char* template_name, int iter, double* data, uint32_t sizex, uin
         free(fname);
         return -1;
     }
-    for (i = 0; i < (sizex * sizey); ++i) {
+    for( i = 0; i < (sizex * sizey); i++ ) {
         if (min > data[i]) { if (0.0 != data[i]) min = data[i]; }
         else if (max < data[i]) { if (0.0 != data[i]) max = data[i]; }
     }
@@ -185,8 +191,8 @@ dump_gray_image(char* template_name, int iter, double* data, uint32_t sizex, uin
     fprintf(fp, "P5 %d %d %d\n", sizex, sizey, MAXVAL);
     if (MAXVAL >= 256) {
         val16 = (int16_t*)malloc(sizex * sizeof(int16_t));
-        for (j = 0; j < sizey; ++j) {
-            for (i = 0; i < sizex; ++i) {
+        for( j = 0; j < sizey; j++ ) {
+            for( i = 0; i < sizex; i++ ) {
                 val16[i] = 0;  /* gracefully handle very small values. */
                 if (data[j*sizex+i] > min)
                     val16[i] = (int16_t)ceil(factor * (data[j*sizex+i]-min));
@@ -196,8 +202,8 @@ dump_gray_image(char* template_name, int iter, double* data, uint32_t sizex, uin
         free(val16);
     } else {
         val8 = (int8_t*)malloc(sizex * sizeof(int8_t));
-        for (j = 0; j < sizey; ++j) {
-            for (i = 0; i < sizex; ++i) {
+        for( j = 0; j < sizey; j++ ) {
+            for( i = 0; i < sizex; i++ ) {
                 val8[i] = 0;  /* gracefully handle very small values. */
                 if (data[j*sizex+i] > min)
                     val8[i] = (int8_t)ceil(factor * (data[j*sizex+i]-min));
@@ -214,8 +220,9 @@ dump_gray_image(char* template_name, int iter, double* data, uint32_t sizex, uin
 /**
  * Dump a matrix into a RGB ppm format.
  */
-int
-dump_rgb_image(char* template_name, int iter, double* data, uint32_t sizex, uint32_t sizey) {
+int dump_rgb_image(char* template_name, int iter,
+                   double* data, uint32_t sizex, uint32_t sizey)
+{
     return 0;
 }
 
@@ -230,7 +237,8 @@ dump_rgb_image(char* template_name, int iter, double* data, uint32_t sizex, uint
 #include <sys/time.h>
 #endif  /* HAVE_TIME_H */
 
-double wtime(void) {
+double wtime(void)
+{
 #if HAVE_CLOCK_GETTIME
     struct timespec tp;
     clock_gettime(CLOCK_REALTIME, &tp);

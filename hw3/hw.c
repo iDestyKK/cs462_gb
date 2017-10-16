@@ -9,13 +9,13 @@
 #include "header.h"
 #include "jacobi.h"
 
-hw3_params_t hw3_params = {0,};
+hw_params_t hw3_params = {0,};
 
 #define BUFSIZE 1024
 #define EPSILON 0.000005
 
 int
-read_input_file(hw3_params_t* params) {
+read_input_file(hw_params_t* params) {
     FILE *infile;
     char buf[BUFSIZE], *cmd;
     int i, n, ret = 0;
@@ -101,7 +101,7 @@ read_input_file(hw3_params_t* params) {
 }
 
 void
-print_params(hw3_params_t* param) {
+print_params(hw_params_t* param) {
     printf("# Max iterations ");
     if (0 == param->max_iterations)
         printf("unrestricted\n");

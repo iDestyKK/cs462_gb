@@ -1,6 +1,6 @@
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "jacobi.h"
 #include "header.h"
@@ -11,18 +11,17 @@ extern const struct relaxation_function_class_s _relaxation_template;
 const struct relaxation_function_class_s * const _relaxation_classes[] =
     {&_relaxation_jacobi, &_relaxation_template, NULL};
 
-relaxation_params_t*
-relaxation_init(struct hw3_params_s* hw_params) {
+relaxation_params_t* relaxation_init(struct hw_params_s* hw_params)
+{
     relaxation_params_t* rp = NULL;
 
-    for (int i = 0; NULL != _relaxation_classes[i]; ++i) {
+    for( int i = 0; NULL != _relaxation_classes[i]; i++ ) {
         if (_relaxation_classes[i]->type != hw_params->alg_type )
             continue;
         if (NULL == (rp =  _relaxation_classes[i]->_init(hw_params)) ) {
             return NULL;
         }
     }
-
     return rp;
 }
 
@@ -33,13 +32,16 @@ relaxation_init(struct hw3_params_s* hw_params) {
  * The difference with a Jacobi is that the updates are happening
  * in place.
  */
-double
-redblack_relaxation(relaxation_params_t* rp, double* o, uint32_t sizex, uint32_t sizey) {
+double redblack_relaxation(relaxation_params_t* rp,
+                           double* o,
+                           uint32_t sizex,
+                           uint32_t sizey)
+{
     double nval, diff, sum = 0.0;
     int i, j;
 
-    for (i = 1; i < sizex; ++i) {
-        for (j = 1; j < sizex; ++j) {
+    for( i = 1; i < sizex; i++ ) {
+        for( j = 1; j < sizex; j++ ) {
             nval = 0.25 * (o[ i    *sizey + (j-1) ]+  // left
                            o[ i    *sizey + (j+1) ]+  // right
                            o[ (i-1)*sizey + j     ]+  // top
@@ -52,3 +54,4 @@ redblack_relaxation(relaxation_params_t* rp, double* o, uint32_t sizex, uint32_t
     return sum;
 }
 #endif
+

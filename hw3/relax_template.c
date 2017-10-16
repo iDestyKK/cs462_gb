@@ -1,6 +1,6 @@
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "jacobi.h"
 #include "header.h"
@@ -17,7 +17,7 @@ struct relaxation_template_hidden_params_s {
 const struct relaxation_function_class_s _relaxation_template;
 
 static struct relaxation_params_s*
-template_relaxation_init(struct hw3_params_s* hw_params)
+template_relaxation_init(struct hw_params_s* hw_params)
 {
     struct relaxation_template_hidden_params_s* rp;
     uint32_t np = hw_params->resolution + 2;
@@ -46,8 +46,8 @@ template_relaxation_init(struct hw3_params_s* hw_params)
     return NULL;
 }
 
-static int
-template_relaxation_fini(relaxation_params_t** prp) {
+static int template_relaxation_fini(relaxation_params_t** prp)
+{
     struct relaxation_template_hidden_params_s* rp = (struct relaxation_template_hidden_params_s*)*prp;
     if (NULL != rp->data) free(rp->data);
     free(rp);
@@ -55,15 +55,15 @@ template_relaxation_fini(relaxation_params_t** prp) {
     return 0;
 }
 
-static int
-template_relaxation_coarsen(relaxation_params_t* grp, double* dst, uint32_t dstx, uint32_t dsty) {
+static int template_relaxation_coarsen(relaxation_params_t* grp, double* dst, uint32_t dstx, uint32_t dsty)
+{
     struct relaxation_template_hidden_params_s* rp = (struct relaxation_template_hidden_params_s*)grp;
     return coarsen(rp->data, rp->super.sizex, rp->super.sizey,
                    dst, dstx, dsty);
 }
 
-static int
-template_relaxation_print(relaxation_params_t* grp, FILE* fp) {
+static int template_relaxation_print(relaxation_params_t* grp, FILE* fp)
+{
     struct relaxation_template_hidden_params_s* rp = (struct relaxation_template_hidden_params_s*)grp;
     fprintf( fp, "\n# Iteration %d\n", rp->idx);
     print_matrix(fp, rp->data, rp->super.sizex, rp->super.sizey);
@@ -74,21 +74,22 @@ template_relaxation_print(relaxation_params_t* grp, FILE* fp) {
 /**
  * One step of a simple Template relaxation.
  */
-static double
-template_relaxation_apply(relaxation_params_t* grp) {
+static double template_relaxation_apply(relaxation_params_t* grp)
+{
     struct relaxation_template_hidden_params_s* rp = (struct relaxation_template_hidden_params_s*)grp;
     fprintf(stdout, "This is only a template relaxation class. No computations are done!\n");
     rp->idx++;
     return 0.0;
 }
 
-static double*
-template_relaxation_get_data(relaxation_params_t* grp) {
+static double* template_relaxation_get_data(relaxation_params_t* grp)
+{
     return ((struct relaxation_template_hidden_params_s*)grp)->data;
 }
 
 
-const struct relaxation_function_class_s _relaxation_template = {
+const struct relaxation_function_class_s _relaxation_template =
+    {
     .type = RELAXATION_TEMPLATE,
     ._init = template_relaxation_init,
     ._fini = template_relaxation_fini,
