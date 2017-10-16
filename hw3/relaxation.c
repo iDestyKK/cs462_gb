@@ -8,7 +8,7 @@
 extern const struct relaxation_function_class_s _relaxation_jacobi;
 extern const struct relaxation_function_class_s _relaxation_template;
 
-const struct relaxation_function_class_s const* _relaxation_classes[] =
+const struct relaxation_function_class_s * const _relaxation_classes[] =
     {&_relaxation_jacobi, &_relaxation_template, NULL};
 
 relaxation_params_t*
