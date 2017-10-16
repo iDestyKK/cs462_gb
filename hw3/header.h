@@ -62,9 +62,15 @@ int coarsen(const double* src, uint32_t srcx, uint32_t srcy,
 /**
  * A function to setup the initial values for the boundaries based on the
  * known heat sources. It is generic for most of the relaxations, for as long
- * as the provided size accounts the boundaries.
+ * as the provided size accounts the boundaries. By providing the correct
+ * position of the initial location we can use this function to initialize
+ * the matrix in distributed environments.
  */
-int relaxation_matrix_set(hw_params_t* hw_params, double* mat, uint32_t np);
+int relaxation_matrix_set(hw_params_t* hw_params,
+                          double* mat,  /* pointer to the local matrix including the ghost regions */
+                          uint32_t ln,  /* # local elements including ghost */
+                          int rowpos,   /* my row position on the global matrix */
+                          int colpos);  /* my col position on the global matrix */
 
 /**
  * The number of differewnt values of gray in the output image */

@@ -23,7 +23,7 @@ jacobi_relaxation_init(struct hw_params_s* hw_params)
         fprintf(stderr, "Cannot allocate memory for the relaxation structure\n");
         return NULL;
     }
-    
+
     rp->super.sizex = np;
     rp->super.sizey = np;
     rp->super.rel_class = &_relaxation_jacobi;
@@ -35,7 +35,7 @@ jacobi_relaxation_init(struct hw_params_s* hw_params)
         fprintf(stderr, "Cannot allocate the memory for the matrices\n");
         goto fail_and_return;
     }
-    relaxation_matrix_set(hw_params, rp->data[0], np);
+    relaxation_matrix_set(hw_params, rp->data[0], np, 0, 0);
 
     /* Copy the boundary conditions on all matrices */
     memcpy(rp->data[1], rp->data[0], np*np*sizeof(double));
