@@ -1,3 +1,18 @@
+/*
+ * COSC 462 - HW3: OpenMP Implementation
+ *
+ * Description:
+ *     Based on the professor's code for serial implementation, this is a
+ *     variation that uses OpenMP to solve the problem in parallel. This will
+ *     give around a linear speedup to the process.
+ *
+ * Approach:
+ *     Just changed one line to add the OpenMP-like pragmas and it worked. ;)
+ *
+ * Author:
+ *     Clara Van Nguyen
+ */
+
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
