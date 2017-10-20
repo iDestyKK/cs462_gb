@@ -1,7 +1,7 @@
 # -*- Makefile -*-
 
 CC = gcc
-CFLAGS ?= -g3 -Wall -std=c11 -D_GNU_SOURCE -pipe -fPIC -fopenmp
+CFLAGS ?= -g3 -Wall -std=c11 -D_GNU_SOURCE -pipe -fPIC -fopenmp -O3
 
 LD = $(CC)
 LDFLAGS = -g
