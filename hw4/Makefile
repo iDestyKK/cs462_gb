@@ -26,3 +26,6 @@ libhw.a: relaxation.o relax_jacobi.o relax_template.o misc.o
 
 clean:
 	rm -rf *.o *.a hw_tester
+
+cleano:
+	rm -rf *.o
