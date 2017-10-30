@@ -1,3 +1,4 @@
+#include <shmem.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -108,7 +109,7 @@ void print_params(hw_params_t* param)
 {
 
     printf("# Participants %d (P = %d, Q = %d)\n",
-           -1, param->num_proc_p, -1 / param->num_proc_p);
+           shmem_n_pes(), param->num_proc_p, shmem_n_pes() / param->num_proc_p);
     printf("# Max iterations ");
     if( 0 == param->max_iterations )
         printf("unrestricted\n");
@@ -171,7 +172,8 @@ int main(int argc, char* argv[] )
     /**
      * Initialize OpenSHMEM
      */
-    //crank = shmem_my_pe();
+	start_pes(0);
+    crank = shmem_my_pe();
     if( 0 == crank )  /* only the root print the banner */
         print_params(&cosc462_hw_params);
 

@@ -18,11 +18,15 @@ lib: libhw2.a
 hw_tester: % : hw.o libhw.a
 	$(LD) -o hw_tester $^ $(LDFLAGS)
 
-libhw.a: relaxation.o relax_jacobi.o relax_template.o misc.o
+libhw.a: relaxation.o relax_jacobi.o relax_template.o relax_shmem.o misc.o cn_vec.o
 	$(AR) cru libhw.a $^
 
 %.o: %.c jacobi.h header.h Makefile
 	$(CC) -c $< -o $@ $(CFLAGS)
+
+# Handy/CNDS
+cn_vec.o: lib/handy/cnds/cn_shvec.c
+	$(CC) $(CFLAGS) -o $@ -c $^
 
 clean:
 	rm -rf *.o *.a hw_tester

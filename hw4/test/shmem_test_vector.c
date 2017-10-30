@@ -42,6 +42,7 @@ void cn_shvec_get(CN_VEC target, const CN_VEC source, int pe) {
 	//Resize the vector accordingly
 	//cn_vec_resize(target, target->size);
 
+	//THE REAL DEAL
 	//Now, copy over ALL data.
 	shmem_getmem(
 		target->data,
