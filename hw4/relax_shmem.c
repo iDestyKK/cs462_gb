@@ -54,8 +54,8 @@ struct relaxation_oshmem_hidden_params_s {
 	struct area* region; //Array of region details for the image
 
 	//Adjacent IDs
-	size_t dir_inx[4];
-	size_t dir_inv[4];
+	int dir_inx[4];
+	int dir_inv[4];
 };
 const struct relaxation_function_class_s _relaxation_oshmem;
 
@@ -97,6 +97,32 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 	relaxation_matrix_set(hw_params, cn_vec_data(rp->data), np, 0, 0);
 	relaxation_matrix_set(hw_params, cn_vec_data(rp->new ), np, 0, 0);
 
+	//This is the fun part. Calculate what nodes are adjacent.
+	rp->dir_inx[0] = rp->id - rp->q;
+	rp->dir_inx[1] = rp->id - 1;
+	rp->dir_inx[2] = rp->id + rp->q;
+	rp->dir_inx[3] = rp->id + 1;
+
+	//Enforce that they actually make sense...
+	if (rp->dir_inx[0] < 0                      ) rp->dir_inx[0] = -1;
+	if (rp->dir_inx[2] >= rp->q * rp->p         ) rp->dir_inx[2] = -1;
+	if (rp->dir_inx[1] / rp->q != rp->id / rp->q) rp->dir_inx[1] = -1;
+	if (rp->dir_inx[3] / rp->q != rp->id / rp->q) rp->dir_inx[3] = -1;
+
+	//Inverse lookup too
+	rp->dir_inv[0] = rp->dir_inx[2];
+	rp->dir_inv[1] = rp->dir_inx[3];
+	rp->dir_inv[2] = rp->dir_inx[0];
+	rp->dir_inv[3] = rp->dir_inx[1];
+
+	printf("%d: %d %d %d %d\n",
+		rp->id,
+		rp->dir_inx[0],
+		rp->dir_inx[1],
+		rp->dir_inx[2],
+		rp->dir_inx[3]
+	);
+
 	//Now, let's initialise the regional data... this is pretty much the exact
 	//same as in HW2...
 	//Create Region Data
@@ -127,10 +153,36 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 		if (i < rp->q - 1) rp->region[ii].send_dir |= (1 << 3);
 
 		//Set up vectors
-		//These vectors will hold the "indexes" of what they should represent.
+		//These vectors will hold the data of what to send over.
+		//
+		//Our awesome algorithm will involve simply copying the vectors over and then
+		//setting the values. This will enforce that the nodes get the data and that
+		//they are synced properly.
+
 		CN_UINT ing = 0;
-		for (; ing < 4; ing++)
+		for (; ing < 4; ing++) {
 			rp->region[ii].dir_vec[ing] = cn_vec_init(CN_UINT);
+			if ((rp->region[ii].send_dir >> ing) & 1) {
+				//Get the size
+				CN_UINT sz;
+				switch (ing) {
+					//Abuse of Switch Statements
+					case 0: 
+					case 2:
+						sz = rp->region[ii].w;
+						break;
+					case 1: 
+					case 3:
+						sz = rp->region[ii].h;
+						break;
+					default:
+						sz = 0;
+						break;
+				}
+
+				cn_vec_resize(rp->region[ii].dir_vec[ing], sz);
+			}
+		}
 
 		//Now let's generate whatever is inside the vectors.
 		//TODO: Implement this...
@@ -184,6 +236,13 @@ static int oshmem_relaxation_fini(relaxation_params_t** prp)
 	struct relaxation_oshmem_hidden_params_s* rp = (struct relaxation_oshmem_hidden_params_s*)*prp;
 	if( NULL != rp->data ) cn_vec_free(rp->data);
 	if( NULL != rp->new  ) cn_vec_free(rp->new );
+
+	//Go into each region and delete the vectors for the edges.
+	CN_UINT i = 0, j;
+	for (; i < rp->q * rp->p; i++) {
+		for (j = 0; j < 4; j++)
+			cn_vec_free(rp->region[i].dir_vec[j]);
+	}
 
 	shfree(rp->region);
 	free(rp);
