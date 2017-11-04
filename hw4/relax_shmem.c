@@ -48,16 +48,27 @@ struct relaxation_oshmem_hidden_params_s {
 			 num_proc,
 			 w, h,
 			 max_w, max_h,
-			 q, p, max_size;
+			 q, p, max_size, tick;
 	CN_VEC data;
 	CN_VEC new;
+	CN_VEC sum;
 	struct area* region; //Array of region details for the image
+	
+	double prev_residual;
 
 	//Adjacent IDs
 	int dir_inx[4];
 	int dir_inv[4];
 };
 const struct relaxation_function_class_s _relaxation_oshmem;
+
+void update_vectors(struct relaxation_oshmem_hidden_params_s* rp) {
+	//TODO: Implement
+}
+
+void sync_vectors(struct relaxation_oshmem_hidden_params_s* rp) {
+	//TODO: Implement
+}
 
 static struct relaxation_params_s*
 oshmem_relaxation_init(struct hw_params_s* hw_params)
@@ -86,12 +97,16 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 	rp->max_w    = (rp->w / rp->q) + (rp->w % rp->q);
 	rp->max_h    = (rp->h / rp->p) + (rp->h % rp->p);
 	rp->max_size = MAX(rp->max_w, rp->max_h);
+	rp->tick     = 0;
 
 	//Now for the new part... Initialise the CN_VECs
 	rp->data = cn_vec_init(double);
+	rp->new  = cn_vec_init(double);
+	rp->sum  = cn_vec_init(double);
+
 	cn_vec_resize(rp->data, np * np);
-	rp->new = cn_vec_init(double);
-	cn_vec_resize(rp->new, np * np);
+	cn_vec_resize(rp->new , np * np);
+	cn_vec_resize(rp->sum , rp->q * rp->p);
 
 	//Setup the data correctly into both matrices
 	relaxation_matrix_set(hw_params, cn_vec_data(rp->data), np, 0, 0);
@@ -115,13 +130,13 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 	rp->dir_inv[2] = rp->dir_inx[0];
 	rp->dir_inv[3] = rp->dir_inx[1];
 
-	printf("%d: %d %d %d %d\n",
+	/*printf("%d: %d %d %d %d\n",
 		rp->id,
 		rp->dir_inx[0],
 		rp->dir_inx[1],
 		rp->dir_inx[2],
 		rp->dir_inx[3]
-	);
+	);*/
 
 	//Now, let's initialise the regional data... this is pretty much the exact
 	//same as in HW2...
@@ -184,36 +199,13 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 			}
 		}
 
-		//Now let's generate whatever is inside the vectors.
-		//TODO: Implement this...
-		//North
-		CN_VEC ptr;
-		if ((rp->region[ii].send_dir) & 1) {
-			ptr = rp->region[ii].dir_vec[0];
-		}
-
-		//West
-		if ((rp->region[ii].send_dir >> 1) & 1) {
-			ptr = rp->region[ii].dir_vec[1];
-		}
-
-		//South
-		if ((rp->region[ii].send_dir >> 2) & 1) {
-			ptr = rp->region[ii].dir_vec[2];
-		}
-
-		//East
-		if ((rp->region[ii].send_dir >> 3) & 1) {
-			ptr = rp->region[ii].dir_vec[3];
-		}
-
-		printf("%d:%c%c%c%c\n",
+		/*printf("%d:%c%c%c%c\n",
 			ii,
 			(rp->region[ii].send_dir     ) & 1 ? '^' : ' ',
 			(rp->region[ii].send_dir >> 1) & 1 ? '<' : ' ',
 			(rp->region[ii].send_dir >> 2) & 1 ? 'v' : ' ',
 			(rp->region[ii].send_dir >> 3) & 1 ? '>' : ' '
-		);
+		);*/
 	}
 
 	//Ensure everything is initialised at the start before moving on.
@@ -271,15 +263,21 @@ static int oshmem_relaxation_print(relaxation_params_t* grp, FILE* fp)
  */
 static double oshmem_relaxation_apply(relaxation_params_t* grp)
 {
+	//Initialise variables
 	struct relaxation_oshmem_hidden_params_s* rp = (struct relaxation_oshmem_hidden_params_s*)grp;
 	double diff, sum = 0.0, *new, *old;
 	int i, j;
 
+	AREA* cr = &rp->region[rp->id];
+
 	new = (double *)cn_vec_data(rp->data);
 	old = (double *)cn_vec_data(rp->new);
-	/* The size[x,y] account for the boundary */
-	for( i = 1; i < (rp->super.sizey-1); i++ ) {
-		for( j = 1; j < (rp->super.sizex-1); j++ ) {
+
+	shmem_barrier_all();
+
+	//Process Jacobi Matrix
+	for (i = MAX(1, cr->y); i < MIN(cr->y + cr->h, rp->h - 1); i++) {
+		for (j = MAX(1, cr->x); j < MIN(cr->x + cr->w, rp->w - 1); j++) {
 			new[i * rp->super.sizex + j] = 0.25 * (
 					old[ i     * rp->super.sizex + (j-1) ] +  // left
 					old[ i     * rp->super.sizex + (j+1) ] +  // right
@@ -291,6 +289,43 @@ static double oshmem_relaxation_apply(relaxation_params_t* grp)
 		}
 	}
 	memcpy(old, new, sizeof(double) * (rp->super.sizex * rp->super.sizey));
+
+	//Manage how the sum is handles over the nodes
+	//Pass all sums to the first node into vector.
+	cn_vec_get(rp->sum, double, rp->id) = sum;
+	if (rp->id != 0) {
+		shmem_double_put(
+			&cn_vec_get(rp->sum, double, rp->id),
+			&cn_vec_get(rp->sum, double, rp->id),
+			1,
+			0
+		);
+	}
+	shmem_barrier_all();
+	
+	//Add all of the sums up.
+	if (rp->id == 0) {
+		CN_UINT pf = 0;
+		sum = 0;
+		for (; pf < cn_vec_size(rp->sum); pf++) {
+			sum += cn_vec_get(rp->sum, double, pf);
+		}
+		cn_vec_get(rp->sum, double, 0) = sum;
+	}
+
+	shmem_barrier_all();
+
+	//Update the other nodes
+	if (rp->id != 0) {
+		shmem_double_get(
+			&cn_vec_get(rp->sum, double, 0),
+			&cn_vec_get(rp->sum, double, 0),
+			1,
+			0
+		);
+		sum = cn_vec_get(rp->sum, double, 0);
+	}
+
 	rp->idx++;
 	return sum;
 }
