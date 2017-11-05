@@ -118,40 +118,32 @@ void sync_vectors(struct relaxation_oshmem_hidden_params_s* rp) {
 				cn_shvec_get(cr->dir_vec[2], cr->dir_vec[2], rp->dir_inx[j]);
 				vec = cn_vec_array(cr->dir_vec[2], double);
 				
-				//Now copy the data back
-				for (i = 0; i < cn_vec_size(cr->dir_vec[2]); i++) {
+				for (i = 0; i < cn_vec_size(cr->dir_vec[2]); i++)
 					data[((cr->y + cr->h - 1) * rp->w) + (cr->x + i)] = vec[i];
-				}
 				break;
 			case 1:
 				//West
 				cn_shvec_get(cr->dir_vec[3], cr->dir_vec[3], rp->dir_inx[j]);
 				vec = cn_vec_array(cr->dir_vec[3], double);
 				
-				//Now copy the data back
-				for (i = 0; i < cn_vec_size(cr->dir_vec[3]); i++) {
+				for (i = 0; i < cn_vec_size(cr->dir_vec[3]); i++)
 					data[((cr->y + i) * rp->w) + (cr->x + cr->w - 1)] = vec[i];
-				}
 				break;
 			case 2:
 				//South
 				cn_shvec_get(cr->dir_vec[0], cr->dir_vec[0], rp->dir_inx[j]);
 				vec = cn_vec_array(cr->dir_vec[0], double);
-				
-				//Now copy the data back
-				for (i = 0; i < cn_vec_size(cr->dir_vec[0]); i++) {
+
+				for (i = 0; i < cn_vec_size(cr->dir_vec[0]); i++)
 					data[(cr->y * rp->w) + (cr->x + i)] = vec[i];
-				}
 				break;
 			case 3:
 				//East
 				cn_shvec_get(cr->dir_vec[1], cr->dir_vec[1], rp->dir_inx[j]);
 				vec = cn_vec_array(cr->dir_vec[1], double);
-				
-				//Now copy the data back
-				for (i = 0; i < cn_vec_size(cr->dir_vec[1]); i++) {
+
+				for (i = 0; i < cn_vec_size(cr->dir_vec[1]); i++)
 					data[((cr->y + i) * rp->w) + cr->x] = vec[i];
-				}
 				break;
 		}
 	}
@@ -245,7 +237,7 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 
 		//Set up vectors
 		//These vectors will hold the data of what to send over.
-		//
+		
 		//Our awesome algorithm will involve simply copying the vectors over and then
 		//setting the values. This will enforce that the nodes get the data and that
 		//they are synced properly.
@@ -279,6 +271,7 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 			}
 		}
 
+		//DEBUG: Check whether adjacent exists
 		/*printf("%d:%c%c%c%c\n",
 			ii,
 			(rp->region[ii].send_dir     ) & 1 ? '^' : ' ',
@@ -299,18 +292,6 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 	rp->dir_inv[1] = rp->dir_inx[3];
 	rp->dir_inv[2] = rp->dir_inx[0];
 	rp->dir_inv[3] = rp->dir_inx[1];
-
-
-	printf(
-		"PROC[%d] %d: %d (%d) %d (%d) %d (%d) %d (%d)\n",
-		rp->id,
-		rp->id,
-		rp->dir_inx[0], cn_vec_size(rp->region[rp->id].dir_vec[0]),
-		rp->dir_inx[1], cn_vec_size(rp->region[rp->id].dir_vec[1]),
-		rp->dir_inx[2], cn_vec_size(rp->region[rp->id].dir_vec[2]),
-		rp->dir_inx[3], cn_vec_size(rp->region[rp->id].dir_vec[3])
-	);
-
 
 	//Ensure everything is initialised at the start before moving on.
 	shmem_barrier_all();
@@ -374,10 +355,14 @@ static double oshmem_relaxation_apply(relaxation_params_t* grp)
 
 	AREA* cr = &rp->region[rp->id];
 
-	new = (double *)cn_vec_data(rp->data);
-	old = (double *)cn_vec_data(rp->new);
+	old = (double *)cn_vec_data(rp->data);
+	new = (double *)cn_vec_data(rp->new);
 
+	//Write edges to CN_VECs and send them over to adjacent nodes.
+	update_vectors(rp);
 	shmem_barrier_all();
+
+	sync_vectors(rp);
 
 	//Process Jacobi Matrix
 	for (i = MAX(1, cr->y); i < MIN(cr->y + cr->h, rp->h - 1); i++) {
@@ -392,27 +377,25 @@ static double oshmem_relaxation_apply(relaxation_params_t* grp)
 			sum += diff * diff;
 		}
 	}
-	memcpy(old, new, sizeof(double) * (rp->super.sizex * rp->super.sizey));
+
+	//Swap the new and old matrix pointers
+	double* tmp = rp->new->data;
+	rp->new->data = rp->data->data;
+	rp->data->data = tmp;
+	cn_vec_get(rp->sum, double, rp->id) = sum;
+
+	shmem_barrier_all();
 
 	//Manage how the sum is handles over the nodes
 	//Pass all sums to the first node into vector.
-	cn_vec_get(rp->sum, double, rp->id) = sum;
-	if (rp->id != 0) {
-		shmem_double_put(
-			&cn_vec_get(rp->sum, double, rp->id),
-			&cn_vec_get(rp->sum, double, rp->id),
-			1,
-			0
-		);
-	}
-	shmem_barrier_all();
-	
 	//Add all of the sums up.
 	if (rp->id == 0) {
-		CN_UINT pf = 0;
-		sum = 0;
+		CN_UINT pf = 1;
+		double lel = 0.0;
+		
 		for (; pf < cn_vec_size(rp->sum); pf++) {
-			sum += cn_vec_get(rp->sum, double, pf);
+			lel = shmem_double_g(&cn_vec_get(rp->sum, double, pf), pf);
+			sum += lel;
 		}
 		cn_vec_get(rp->sum, double, 0) = sum;
 	}
@@ -429,15 +412,6 @@ static double oshmem_relaxation_apply(relaxation_params_t* grp)
 		);
 		sum = cn_vec_get(rp->sum, double, 0);
 	}
-
-	shmem_barrier_all();
-
-	//Finally, write edges to vectors and send them over.
-	update_vectors(rp);
-	shmem_barrier_all();
-
-	sync_vectors(rp);
-	shmem_barrier_all();
 
 	rp->idx++;
 	return sum;
