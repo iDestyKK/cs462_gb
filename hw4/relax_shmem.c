@@ -26,12 +26,13 @@ void cn_shvec_get(CN_VEC target, const CN_VEC source, int pe) {
 	//shrealloc calls "shmem_barrier_all()", which deadlocks this unless
 	//the size of the two vectors are the same!
 
-	shmem_getmem(
+	/*shmem_getmem(
 		target->data,
 		source->data,
 		cn_vec_size(target) * cn_vec_element_size(target),
 		pe
-	);
+	);*/
+	shmem_double_get(target->data, source->data, cn_vec_size(target), pe);
 }
 
 typedef struct area {
@@ -64,10 +65,96 @@ const struct relaxation_function_class_s _relaxation_oshmem;
 
 void update_vectors(struct relaxation_oshmem_hidden_params_s* rp) {
 	//TODO: Implement
+	//Notice that, below in the init function, that dir_vec's size is dependent
+	//on whether or not that edge can actually be reached. In other words, if
+	//that node can't go above, then cr->dir_vec[0]'s size is 0, and so forth.
+	
+	AREA* cr = &rp->region[rp->id];
+	CN_UINT i;
+	double* data = cn_vec_array(rp->data, double);
+	
+	//North vector
+	for (i = 0; i < cn_vec_size(cr->dir_vec[0]); i++) {
+		cn_vec_get(cr->dir_vec[0], double, i) =
+			data[(cr->y * rp->w) + (cr->x + i)];
+	}
+
+	//West Vector
+	for (i = 0; i < cn_vec_size(cr->dir_vec[1]); i++) {
+		cn_vec_get(cr->dir_vec[1], double, i) =
+			data[((cr->y + i) * rp->w) + cr->x];
+	}
+	
+	//South Vector
+	for (i = 0; i < cn_vec_size(cr->dir_vec[2]); i++) {
+		cn_vec_get(cr->dir_vec[2], double, i) =
+			data[((cr->y + cr->h - 1) * rp->w) + (cr->x + i)];
+	}
+	
+	//East Vector
+	for (i = 0; i < cn_vec_size(cr->dir_vec[3]); i++) {
+		cn_vec_get(cr->dir_vec[3], double, i) =
+			data[((cr->y + i) * rp->w) + (cr->x + cr->w - 1)];
+	}
 }
 
 void sync_vectors(struct relaxation_oshmem_hidden_params_s* rp) {
 	//TODO: Implement
+	CN_UINT i, j;
+	AREA* cr,
+	    * rr = &rp->region[rp->id];
+	double* data = cn_vec_array(rp->data, double);
+	double* vec;
+
+	for (j = 0; j < 4; j++) {
+		if (rp->dir_inx[j] == -1)
+			continue;
+		cr = &rp->region[rp->dir_inx[j]];
+
+
+		switch (j) {
+			case 0:
+				//North
+				cn_shvec_get(cr->dir_vec[2], cr->dir_vec[2], rp->dir_inx[j]);
+				vec = cn_vec_array(cr->dir_vec[2], double);
+				
+				//Now copy the data back
+				for (i = 0; i < cn_vec_size(cr->dir_vec[2]); i++) {
+					data[((cr->y + cr->h - 1) * rp->w) + (cr->x + i)] = vec[i];
+				}
+				break;
+			case 1:
+				//West
+				cn_shvec_get(cr->dir_vec[3], cr->dir_vec[3], rp->dir_inx[j]);
+				vec = cn_vec_array(cr->dir_vec[3], double);
+				
+				//Now copy the data back
+				for (i = 0; i < cn_vec_size(cr->dir_vec[3]); i++) {
+					data[((cr->y + i) * rp->w) + (cr->x + cr->w - 1)] = vec[i];
+				}
+				break;
+			case 2:
+				//South
+				cn_shvec_get(cr->dir_vec[0], cr->dir_vec[0], rp->dir_inx[j]);
+				vec = cn_vec_array(cr->dir_vec[0], double);
+				
+				//Now copy the data back
+				for (i = 0; i < cn_vec_size(cr->dir_vec[0]); i++) {
+					data[(cr->y * rp->w) + (cr->x + i)] = vec[i];
+				}
+				break;
+			case 3:
+				//East
+				cn_shvec_get(cr->dir_vec[1], cr->dir_vec[1], rp->dir_inx[j]);
+				vec = cn_vec_array(cr->dir_vec[1], double);
+				
+				//Now copy the data back
+				for (i = 0; i < cn_vec_size(cr->dir_vec[1]); i++) {
+					data[((cr->y + i) * rp->w) + cr->x] = vec[i];
+				}
+				break;
+		}
+	}
 }
 
 static struct relaxation_params_s*
@@ -118,17 +205,6 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 	rp->dir_inx[2] = rp->id + rp->q;
 	rp->dir_inx[3] = rp->id + 1;
 
-	//Enforce that they actually make sense...
-	if (rp->dir_inx[0] < 0                      ) rp->dir_inx[0] = -1;
-	if (rp->dir_inx[2] >= rp->q * rp->p         ) rp->dir_inx[2] = -1;
-	if (rp->dir_inx[1] / rp->q != rp->id / rp->q) rp->dir_inx[1] = -1;
-	if (rp->dir_inx[3] / rp->q != rp->id / rp->q) rp->dir_inx[3] = -1;
-
-	//Inverse lookup too
-	rp->dir_inv[0] = rp->dir_inx[2];
-	rp->dir_inv[1] = rp->dir_inx[3];
-	rp->dir_inv[2] = rp->dir_inx[0];
-	rp->dir_inv[3] = rp->dir_inx[1];
 
 	/*printf("%d: %d %d %d %d\n",
 		rp->id,
@@ -176,17 +252,21 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 
 		CN_UINT ing = 0;
 		for (; ing < 4; ing++) {
-			rp->region[ii].dir_vec[ing] = cn_vec_init(CN_UINT);
+			rp->region[ii].dir_vec[ing] = cn_vec_init(double);
 			if ((rp->region[ii].send_dir >> ing) & 1) {
 				//Get the size
 				CN_UINT sz;
 				switch (ing) {
 					//Abuse of Switch Statements
 					case 0: 
-					case 2:
 						sz = rp->region[ii].w;
 						break;
 					case 1: 
+						sz = rp->region[ii].h;
+						break;
+					case 2:
+						sz = rp->region[ii].w;
+						break;
 					case 3:
 						sz = rp->region[ii].h;
 						break;
@@ -207,6 +287,30 @@ oshmem_relaxation_init(struct hw_params_s* hw_params)
 			(rp->region[ii].send_dir >> 3) & 1 ? '>' : ' '
 		);*/
 	}
+
+	//Enforce that they actually make sense...
+	if (rp->dir_inx[0] < 0                      ) rp->dir_inx[0] = -1;
+	if (rp->dir_inx[2] >= rp->q * rp->p         ) rp->dir_inx[2] = -1;
+	if (rp->dir_inx[1] / rp->q != rp->id / rp->q) rp->dir_inx[1] = -1;
+	if (rp->dir_inx[3] / rp->q != rp->id / rp->q) rp->dir_inx[3] = -1;
+
+	//Inverse lookup too
+	rp->dir_inv[0] = rp->dir_inx[2];
+	rp->dir_inv[1] = rp->dir_inx[3];
+	rp->dir_inv[2] = rp->dir_inx[0];
+	rp->dir_inv[3] = rp->dir_inx[1];
+
+
+	printf(
+		"PROC[%d] %d: %d (%d) %d (%d) %d (%d) %d (%d)\n",
+		rp->id,
+		rp->id,
+		rp->dir_inx[0], cn_vec_size(rp->region[rp->id].dir_vec[0]),
+		rp->dir_inx[1], cn_vec_size(rp->region[rp->id].dir_vec[1]),
+		rp->dir_inx[2], cn_vec_size(rp->region[rp->id].dir_vec[2]),
+		rp->dir_inx[3], cn_vec_size(rp->region[rp->id].dir_vec[3])
+	);
+
 
 	//Ensure everything is initialised at the start before moving on.
 	shmem_barrier_all();
@@ -279,11 +383,11 @@ static double oshmem_relaxation_apply(relaxation_params_t* grp)
 	for (i = MAX(1, cr->y); i < MIN(cr->y + cr->h, rp->h - 1); i++) {
 		for (j = MAX(1, cr->x); j < MIN(cr->x + cr->w, rp->w - 1); j++) {
 			new[i * rp->super.sizex + j] = 0.25 * (
-					old[ i     * rp->super.sizex + (j-1) ] +  // left
-					old[ i     * rp->super.sizex + (j+1) ] +  // right
-					old[ (i-1) * rp->super.sizex + j     ] +  // top
-					old[ (i+1) * rp->super.sizex + j     ]    // bottom
-					);
+				old[ i     * rp->super.sizex + (j-1) ] +  // left
+				old[ i     * rp->super.sizex + (j+1) ] +  // right
+				old[ (i-1) * rp->super.sizex + j     ] +  // top
+				old[ (i+1) * rp->super.sizex + j     ]    // bottom
+			);
 			diff = new[i*rp->super.sizex+j] - old[i*rp->super.sizex+j];
 			sum += diff * diff;
 		}
@@ -325,6 +429,15 @@ static double oshmem_relaxation_apply(relaxation_params_t* grp)
 		);
 		sum = cn_vec_get(rp->sum, double, 0);
 	}
+
+	shmem_barrier_all();
+
+	//Finally, write edges to vectors and send them over.
+	update_vectors(rp);
+	shmem_barrier_all();
+
+	sync_vectors(rp);
+	shmem_barrier_all();
 
 	rp->idx++;
 	return sum;
