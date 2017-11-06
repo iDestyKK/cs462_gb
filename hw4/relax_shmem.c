@@ -26,13 +26,12 @@ void cn_shvec_get(CN_VEC target, const CN_VEC source, int pe) {
 	//shrealloc calls "shmem_barrier_all()", which deadlocks this unless
 	//the size of the two vectors are the same!
 
-	/*shmem_getmem(
+	shmem_getmem(
 		target->data,
 		source->data,
 		cn_vec_size(target) * cn_vec_element_size(target),
 		pe
-	);*/
-	shmem_double_get(target->data, source->data, cn_vec_size(target), pe);
+	);
 }
 
 typedef struct area {
