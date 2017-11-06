@@ -1,6 +1,6 @@
 CC = oshcc
 LD = oshcc
-CFLAGS = -g3 -std=c11 -D_GNU_SOURCE
+CFLAGS = -g3 -std=c11 -D_GNU_SOURCE -fopenmp
 LDFLAGS = -g -lm
 #CFLAGS = -Wall -O3 -DNDEBUG
 #LDFLAGS = -O3
@@ -10,7 +10,7 @@ AR = ar
 
 all: hw_tester
 
-fast: CFLAGS = -std=c11 -D_GNU_SOURCE -O3
+fast: CFLAGS = -std=c11 -D_GNU_SOURCE -O3 -fopenmp
 fast: clean hw_tester
 
 lib: libhw.a
