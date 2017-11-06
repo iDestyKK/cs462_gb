@@ -1,6 +1,6 @@
-num_proc_p 1
+num_proc_p 4
 iter 100000
-alg 5 # OpenSHMEM Jacobi
+alg 0
 resolution 2560
 threads 1
 vis_res 256
