@@ -1,5 +1,5 @@
 iter 1000
-alg 0 # Jacobi
+alg 2 # Jacobi
 resolution 256
 threads 1
 vis_res 256
