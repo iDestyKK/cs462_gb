@@ -1,7 +1,7 @@
 CC = oshcc
 LD = oshcc
 CFLAGS = -g3 -std=c11 -D_GNU_SOURCE -fopenmp
-LDFLAGS = -g -lm
+LDFLAGS = -g -lm -fopenmp
 #CFLAGS = -Wall -O3 -DNDEBUG
 #LDFLAGS = -O3
 AR = ar
@@ -18,11 +18,15 @@ lib: libhw.a
 hw_tester: % : hw.o libhw.a
 	$(LD) -o hw_tester $^ $(LDFLAGS)
 
-libhw.a: relaxation.o relax_jacobi.o relax_template.o misc.o
+libhw.a: relaxation.o relax_jacobi.o relax_template.o relax_shmem_op.o misc.o cn_vec.o
 	$(AR) cru libhw.a $^
 
 %.o: %.c jacobi.h header.h Makefile
 	$(CC) -c $< -o $@ $(CFLAGS)
+
+# Handy/CNDS
+cn_vec.o: lib/handy/cnds/cn_shvec.c
+	$(CC) $(CFLAGS) -o $@ -c $^
 
 clean:
 	rm -rf *.o *.a hw_tester
