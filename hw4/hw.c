@@ -1,3 +1,4 @@
+#include <shmem.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -108,7 +109,7 @@ void print_params(hw_params_t* param)
 {
 
     printf("# Participants %d (P = %d, Q = %d)\n",
-           -1, param->num_proc_p, -1 / param->num_proc_p);
+           shmem_n_pes(), param->num_proc_p, shmem_n_pes() / param->num_proc_p);
     printf("# Max iterations ");
     if( 0 == param->max_iterations )
         printf("unrestricted\n");
@@ -171,7 +172,8 @@ int main(int argc, char* argv[] )
     /**
      * Initialize OpenSHMEM
      */
-    //crank = shmem_my_pe();
+	start_pes(0);
+    crank = shmem_my_pe();
     if( 0 == crank )  /* only the root print the banner */
         print_params(&cosc462_hw_params);
 
@@ -180,7 +182,7 @@ int main(int argc, char* argv[] )
         fprintf(stderr, "Error initializing the relaxation. Bail out!\n");
         return -1;
     }
-    if( COSC462_HW_FLAG_GENERATE_HEAT_IMAGE & cosc462_hw_params.flags ) {
+    if( COSC462_HW_FLAG_GENERATE_HEAT_IMAGE & cosc462_hw_params.flags && 0 == crank ) {
         relaxation_coarsen(rp, cosc462_hw_params.vis_data, cosc462_hw_params.vis_res, cosc462_hw_params.vis_res);
         dump_gray_image(cosc462_hw_params.vis_output, 0,
                         cosc462_hw_params.vis_data, cosc462_hw_params.vis_res, cosc462_hw_params.vis_res);
@@ -196,7 +198,7 @@ int main(int argc, char* argv[] )
          */
         if( 0 == (iter % cosc462_hw_params.vis_step) ) {
             double s = wtime();
-            if( COSC462_HW_FLAG_GENERATE_HEAT_IMAGE & cosc462_hw_params.flags ) {
+            if( COSC462_HW_FLAG_GENERATE_HEAT_IMAGE & cosc462_hw_params.flags && 0 == crank ) {
                 relaxation_coarsen(rp, cosc462_hw_params.vis_data, cosc462_hw_params.vis_res, cosc462_hw_params.vis_res);
                 /*print_matrix(cosc462_hw_params.vis_data, cosc462_hw_params.vis_res, cosc462_hw_params.vis_res);*/
                 dump_gray_image(cosc462_hw_params.vis_output, iter,

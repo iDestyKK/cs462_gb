@@ -7,9 +7,10 @@
 
 extern const struct relaxation_function_class_s _relaxation_jacobi;
 extern const struct relaxation_function_class_s _relaxation_template;
+extern const struct relaxation_function_class_s _relaxation_oshmem;
 
 const struct relaxation_function_class_s * const _relaxation_classes[] =
-    {&_relaxation_jacobi, &_relaxation_template, NULL};
+    {&_relaxation_jacobi, &_relaxation_template, &_relaxation_oshmem, NULL};
 
 relaxation_params_t* relaxation_init(struct hw_params_s* hw_params)
 {
